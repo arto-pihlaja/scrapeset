@@ -5,12 +5,12 @@ requests-cache==1.1.1
 playwright==1.40.0
 
 # LLM and AI (unified interface)
-litellm==1.13.0
-langchain==0.1.0
-langchain-community==0.0.10
+litellm>=1.77.0
+langchain>=0.3.0
+langchain-community>=0.3.0
 
 # Vector database
-chromadb==0.4.18
+chromadb>=0.5.0
 
 # Text processing
 spacy==3.7.2

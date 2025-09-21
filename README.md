@@ -1,19 +1,342 @@
-# scrapeset
+# ScrapeSET - Web Scraping + RAG Tool
 
-This is a project to scrape text from the web and analyse it using an LLM.
-Implementation proceeds in iterations. We'll use Git branches for new features.
+A powerful command-line tool for scraping web content and querying it using Retrieval-Augmented Generation (RAG). Extract text from websites, store it in a vector database, and ask intelligent questions about the content.
 
-Initial idea for tech stack:
-- Python for logic
-- scrapy for web scraping
-- CrewAI for AI agent coordination, when needed
-- Git for version control
-- Hosted LLMs connected through OpenRouter
-- Chroma for local vector db
+## ✨ Features
 
+- **Smart Web Scraping**: Extract and filter text content from any website
+- **Interactive Content Selection**: Review and choose which text elements to include
+- **Vector Storage**: Automatic chunking and embedding storage using ChromaDB
+- **RAG-Powered Q&A**: Ask questions about scraped content with context-aware responses
+- **Multiple LLM Support**: Works with OpenAI, Anthropic, and OpenRouter APIs
+- **Rich CLI Interface**: Beautiful command-line interface with progress indicators
+- **Persistent Storage**: Your scraped content is saved locally for future queries
 
-First use case:
-User enters web address.
-Program proceeds to scrape text data from the page. If there are several elements of text > 300 characters (configurable), the program shows the 50 words of each in turn and asks user if it should be included.
-The ones that the user selects will be chunked and indexed in Chroma for RAG.
-The user is then prompted to ask questions about the content.
+## 🚀 Quick Start
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd scrape
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up environment variables (optional):
+```bash
+# Create .env file with your API keys
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+OPENROUTER_API_KEY=your_openrouter_key
+```
+
+### Basic Usage
+
+1. **Scrape a website**:
+```bash
+python main.py scrape https://example.com
+```
+The tool will extract text elements and let you choose which ones to include.
+
+2. **Ask questions about the content**:
+```bash
+python main.py query "What is the main topic of this article?"
+```
+
+3. **Start an interactive chat session**:
+```bash
+python main.py chat
+```
+
+4. **Check your collection status**:
+```bash
+python main.py status
+```
+
+5. **List all collections**:
+```bash
+python main.py collections
+```
+
+## 📖 Commands
+
+### `scrape`
+Scrape a website and add content to your vector store.
+
+```bash
+python main.py scrape URL [OPTIONS]
+```
+
+**Options:**
+- `--interactive/--auto`: Enable/disable interactive text selection (default: interactive)
+- `--collection TEXT`: Specify collection name for vector store
+
+**Example:**
+```bash
+# Interactive scraping (default)
+python main.py scrape https://python.org
+
+# Auto-include all text elements
+python main.py scrape https://python.org --auto
+
+# Use custom collection
+python main.py scrape https://python.org --collection python_docs
+```
+
+### `query`
+Ask a question using RAG (Retrieval-Augmented Generation).
+
+```bash
+python main.py query "YOUR QUESTION" [OPTIONS]
+```
+
+**Options:**
+- `--collection TEXT`: Collection name to query
+- `--results INTEGER`: Number of context documents to retrieve (default: 5)
+
+**Example:**
+```bash
+python main.py query "What are the main features mentioned?"
+python main.py query "Explain the installation process" --results 3
+```
+
+### `chat`
+Start an interactive chat session.
+
+```bash
+python main.py chat [OPTIONS]
+```
+
+**Options:**
+- `--collection TEXT`: Collection name to use
+- `--results INTEGER`: Number of context documents to retrieve (default: 5)
+
+### `status`
+Show the status of your vector store and sources.
+
+```bash
+python main.py status [OPTIONS]
+```
+
+**Options:**
+- `--collection TEXT`: Collection name to check
+
+### `collections`
+List all collections in the vector store.
+
+```bash
+python main.py collections
+```
+
+Shows all available collections with their document counts and metadata.
+
+### `clear`
+Clear documents from the vector store.
+
+```bash
+python main.py clear [OPTIONS]
+```
+
+**Options:**
+- `--collection TEXT`: Collection name to clear
+- `--url TEXT`: Clear only documents from a specific URL
+
+**Examples:**
+```bash
+# Clear all documents
+python main.py clear
+
+# Clear documents from specific URL
+python main.py clear --url https://example.com
+```
+
+## ⚙️ Configuration
+
+The tool can be configured through environment variables or a `.env` file:
+
+### LLM Configuration
+```bash
+# API Keys (at least one required)
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+OPENROUTER_API_KEY=your_openrouter_key
+
+# LLM Settings
+DEFAULT_LLM_PROVIDER=openai
+DEFAULT_MODEL=gpt-3.5-turbo
+LLM_TEMPERATURE=0.1
+MAX_TOKENS=2000
+```
+
+**Supported Models:**
+```bash
+# OpenRouter models (when OPENROUTER_API_KEY is set)
+DEFAULT_MODEL=mistralai/mistral-small-3.2-24b-instruct
+DEFAULT_MODEL=anthropic/claude-3-haiku-20240307
+DEFAULT_MODEL=google/gemini-pro-1.5
+DEFAULT_MODEL=meta-llama/llama-3.1-8b-instruct
+
+# OpenAI models (when OPENAI_API_KEY is set)
+DEFAULT_MODEL=gpt-4
+DEFAULT_MODEL=gpt-3.5-turbo
+
+# Anthropic models (when ANTHROPIC_API_KEY is set)
+DEFAULT_MODEL=claude-3-sonnet-20240229
+```
+
+**Note:** The system automatically adds the correct provider prefix (e.g., `openrouter/`, `openai/`) based on your API keys.
+
+### Text Processing
+```bash
+MIN_TEXT_LENGTH=300          # Minimum text length to consider
+TEXT_PREVIEW_WORDS=50        # Words shown in preview
+CHUNK_SIZE=1000             # Text chunk size for embedding
+CHUNK_OVERLAP=200           # Overlap between chunks
+```
+
+### Vector Database
+```bash
+CHROMA_PERSIST_DIRECTORY=./data/chroma_db
+COLLECTION_NAME=scraped_content
+EMBEDDING_MODEL=default              # Embedding model to use
+```
+
+### Scraping Settings
+```bash
+REQUEST_TIMEOUT=30           # HTTP request timeout
+MAX_RETRIES=3               # Maximum retry attempts
+USER_AGENT=Mozilla/5.0...   # Custom user agent
+```
+
+## 🧠 Embedding Models
+
+Choose different embedding models for RAG by setting the `EMBEDDING_MODEL` environment variable:
+
+### Available Options:
+
+```bash
+# Default ChromaDB embedding (sentence-transformers/all-MiniLM-L6-v2)
+EMBEDDING_MODEL=default
+
+# OpenAI embeddings (requires OPENAI_API_KEY)
+EMBEDDING_MODEL=openai
+
+# High-quality sentence transformers
+EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2
+
+# Multilingual model
+EMBEDDING_MODEL=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+# Instructor embeddings for better domain adaptation
+EMBEDDING_MODEL=instructor
+
+# Any sentence-transformers model from Hugging Face
+EMBEDDING_MODEL=sentence-transformers/all-distilroberta-v1
+```
+
+### Embedding Model Comparison:
+
+| Model | Quality | Speed | Use Case |
+|-------|---------|-------|----------|
+| `default` | Good | Fast | General purpose, quick setup |
+| `openai` | Excellent | Medium | High quality, requires API key |
+| `all-mpnet-base-v2` | Excellent | Slow | Best quality for English |
+| `all-MiniLM-L6-v2` | Good | Fast | Balanced speed/quality |
+| `instructor` | Excellent | Medium | Domain-specific tasks |
+
+### Example Usage:
+
+```bash
+# Use OpenAI embeddings
+EMBEDDING_MODEL=openai OPENAI_API_KEY=your_key python main.py scrape https://example.com
+
+# Use high-quality sentence transformers
+EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2 python main.py scrape https://example.com
+```
+
+**Note:** Different embedding models create incompatible vector spaces. Use `python main.py clear` when switching embedding models.
+
+## 🏗️ Architecture
+
+The project follows a modular architecture:
+
+```
+src/
+├── scraper/        # Web scraping functionality
+├── text/          # Text processing and chunking
+├── vector/        # Vector database operations
+├── llm/           # LLM interface and RAG
+├── cli/           # Command-line interface
+├── config/        # Configuration management
+└── utils/         # Logging and utilities
+```
+
+### Core Components
+
+- **WebScraper**: Handles URL fetching, HTML parsing, and text extraction
+- **TextProcessor**: Cleans text, creates chunks, and counts tokens
+- **VectorStore**: Manages ChromaDB operations and similarity search
+- **LLMClient**: Interfaces with multiple LLM providers via LiteLLM
+- **CLI**: Provides user-friendly command-line interface
+
+## 🧪 Testing
+
+Run the test suite:
+
+```bash
+python -m pytest tests/ -v
+```
+
+## 📝 Tech Stack
+
+- **Python 3.12+**: Core language
+- **BeautifulSoup4**: HTML parsing and text extraction
+- **ChromaDB**: Vector database for embeddings
+- **LiteLLM**: Unified interface for multiple LLM providers
+- **Typer**: Command-line interface framework
+- **Rich**: Beautiful terminal output
+- **Tiktoken**: Token counting
+- **Loguru**: Advanced logging
+
+## 🛣️ Roadmap
+
+### Current Version (v1.0)
+- ✅ Basic web scraping with interactive selection
+- ✅ Vector storage and RAG queries
+- ✅ Multi-LLM support
+- ✅ CLI interface
+
+### Future Enhancements
+- **Enhanced Scraping**: JavaScript rendering, PDF support, bulk processing
+- **Advanced RAG**: Multiple embedding models, re-ranking, optimization
+- **Better UX**: Web interface, configuration profiles, export/import
+- **Performance**: Async processing, caching, batch operations
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+If you encounter any issues or have questions:
+
+1. Check the [documentation](docs/)
+2. Look at existing [issues](../../issues)
+3. Create a new issue with detailed information
+
+---
+
+**Happy scraping and querying! 🎉**
