@@ -8,9 +8,10 @@ A powerful command-line tool for scraping web content and querying it using Retr
 - **Interactive Content Selection**: Review and choose which text elements to include
 - **Vector Storage**: Automatic chunking and embedding storage using ChromaDB
 - **RAG-Powered Q&A**: Ask questions about scraped content with context-aware responses
+- **Conversation Memory**: Multi-turn conversations with context retention and history
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, and OpenRouter APIs
 - **Rich CLI Interface**: Beautiful command-line interface with progress indicators
-- **Persistent Storage**: Your scraped content is saved locally for future queries
+- **Persistent Storage**: Your scraped content and conversations are saved locally
 
 ## 🚀 Quick Start
 
@@ -106,7 +107,7 @@ python main.py query "Explain the installation process" --results 3
 ```
 
 ### `chat`
-Start an interactive chat session.
+Start an interactive chat session with conversation memory.
 
 ```bash
 python main.py chat [OPTIONS]
@@ -115,6 +116,25 @@ python main.py chat [OPTIONS]
 **Options:**
 - `--collection TEXT`: Collection name to use
 - `--results INTEGER`: Number of context documents to retrieve (default: 5)
+- `--memory/--no-memory`: Enable/disable conversation memory (default: enabled)
+- `--save/--no-save`: Save conversation to file (default: from config)
+
+**Chat Commands:**
+- `quit`, `exit`, `q`: End the chat session
+- `clear`: Clear conversation history
+- `history`: View conversation history
+
+**Example:**
+```bash
+# Chat with memory enabled (default)
+python main.py chat
+
+# Chat without memory
+python main.py chat --no-memory
+
+# Chat with auto-save enabled
+python main.py chat --save
+```
 
 ### `status`
 Show the status of your vector store and sources.
@@ -134,6 +154,30 @@ python main.py collections
 ```
 
 Shows all available collections with their document counts and metadata.
+
+### `conversations`
+Manage saved conversations.
+
+```bash
+python main.py conversations [OPTIONS]
+```
+
+**Options:**
+- `--list`: List all saved conversations
+- `--load TEXT`: Load and display conversation by session ID
+- `--delete TEXT`: Delete conversation by session ID
+
+**Examples:**
+```bash
+# List all saved conversations
+python main.py conversations --list
+
+# View a specific conversation
+python main.py conversations --load abc123de
+
+# Delete a conversation
+python main.py conversations --delete abc123de
+```
 
 ### `clear`
 Clear documents from the vector store.
@@ -194,6 +238,7 @@ DEFAULT_MODEL=claude-3-sonnet-20240229
 ### Text Processing
 ```bash
 MIN_TEXT_LENGTH=300          # Minimum text length to consider
+MIN_WORD_COUNT=100           # Minimum word count to filter out navigation
 TEXT_PREVIEW_WORDS=50        # Words shown in preview
 CHUNK_SIZE=1000             # Text chunk size for embedding
 CHUNK_OVERLAP=200           # Overlap between chunks
@@ -204,6 +249,13 @@ CHUNK_OVERLAP=200           # Overlap between chunks
 CHROMA_PERSIST_DIRECTORY=./data/chroma_db
 COLLECTION_NAME=scraped_content
 EMBEDDING_MODEL=default              # Embedding model to use
+```
+
+### Conversation Memory
+```bash
+CONVERSATION_MEMORY_SIZE=5           # Number of exchange pairs to remember
+CONVERSATION_PERSISTENCE=false      # Auto-save conversations
+CONVERSATION_CONTEXT_RATIO=0.3      # Balance between RAG context and conversation history
 ```
 
 ### Scraping Settings
@@ -310,6 +362,9 @@ python -m pytest tests/ -v
 - ✅ Vector storage and RAG queries
 - ✅ Multi-LLM support
 - ✅ CLI interface
+- ✅ Conversation memory and context retention
+- ✅ Multiple embedding models support
+- ✅ Conversation persistence and management
 
 ### Future Enhancements
 - **Enhanced Scraping**: JavaScript rendering, PDF support, bulk processing

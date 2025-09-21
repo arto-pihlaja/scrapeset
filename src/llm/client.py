@@ -52,63 +52,79 @@ class LLMClient:
             else:
                 return model
 
-    def _build_rag_prompt(self, query: str, context_documents: List[Dict[str, Any]]) -> str:
-        """Build a RAG prompt with query and retrieved context.
+    def _build_rag_prompt(
+        self,
+        query: str,
+        context_documents: List[Dict[str, Any]],
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> str:
+        """Build a RAG prompt with query, retrieved context, and conversation history.
 
         Args:
             query: User's query
             context_documents: List of retrieved documents with content and metadata
+            conversation_history: Optional conversation history for context
 
         Returns:
             Formatted prompt string
         """
-        if not context_documents:
-            return f"""Please answer the following question:
+        prompt_parts = []
 
-{query}
+        # Add conversation history if available
+        if conversation_history:
+            prompt_parts.append("CONVERSATION HISTORY:")
+            for msg in conversation_history:
+                role = "Human" if msg["role"] == "user" else "Assistant"
+                prompt_parts.append(f"{role}: {msg['content']}")
+            prompt_parts.append("")
 
-Note: I don't have any specific context documents to reference for this question."""
+        # Add context documents if available
+        if context_documents:
+            prompt_parts.append("CONTEXT DOCUMENTS:")
+            for i, doc in enumerate(context_documents, 1):
+                content = doc.get('document', '')
+                metadata = doc.get('metadata', {})
+                source_title = metadata.get('source_title', 'Unknown')
+                source_url = metadata.get('source_url', 'Unknown')
 
-        # Build context section
-        context_parts = []
-        for i, doc in enumerate(context_documents, 1):
-            content = doc.get('document', '')
-            metadata = doc.get('metadata', {})
-            source_title = metadata.get('source_title', 'Unknown')
-            source_url = metadata.get('source_url', 'Unknown')
+                prompt_parts.append(f"[Context {i}]")
+                prompt_parts.append(f"Source: {source_title}")
+                prompt_parts.append(f"URL: {source_url}")
+                prompt_parts.append(f"Content: {content}")
+                prompt_parts.append("")
 
-            context_parts.append(f"""[Context {i}]
-Source: {source_title}
-URL: {source_url}
-Content: {content}
-""")
+        # Add instructions
+        if context_documents and conversation_history:
+            instruction = """Based on the conversation history and context documents above, please answer the following question. Use the conversation history to understand the context and flow of our discussion, and use the context documents to provide accurate, relevant information. If you need to reference previous parts of our conversation, feel free to do so."""
+        elif context_documents:
+            instruction = """Based on the following context documents, please answer the question. Use the information from the context to provide a comprehensive and accurate response. If the context doesn't contain enough information to fully answer the question, please indicate that."""
+        elif conversation_history:
+            instruction = """Based on our conversation history above, please answer the following question. You can reference previous parts of our conversation as needed."""
+        else:
+            instruction = """Please answer the following question based on your knowledge:"""
 
-        context_text = "\n".join(context_parts)
+        prompt_parts.append(instruction)
+        prompt_parts.append("")
+        prompt_parts.append(f"CURRENT QUESTION: {query}")
+        prompt_parts.append("")
+        prompt_parts.append("ANSWER:")
 
-        prompt = f"""Based on the following context documents, please answer the question. Use the information from the context to provide a comprehensive and accurate response. If the context doesn't contain enough information to fully answer the question, please indicate that.
-
-CONTEXT:
-{context_text}
-
-QUESTION:
-{query}
-
-ANSWER:"""
-
-        return prompt
+        return "\n".join(prompt_parts)
 
     def generate_response(
         self,
         query: str,
         context_documents: List[Dict[str, Any]],
+        conversation_history: Optional[List[Dict[str, str]]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Generate a response to a query using retrieved context documents.
+        """Generate a response to a query using retrieved context documents and conversation history.
 
         Args:
             query: User's query
             context_documents: List of retrieved documents with content and metadata
+            conversation_history: Optional conversation history for context
             temperature: Temperature for response generation (uses config default if None)
             max_tokens: Maximum tokens for response (uses config default if None)
 
@@ -122,8 +138,8 @@ ANSWER:"""
             if max_tokens is None:
                 max_tokens = settings.max_tokens
 
-            # Build the prompt
-            prompt = self._build_rag_prompt(query, context_documents)
+            # Build the prompt with conversation history
+            prompt = self._build_rag_prompt(query, context_documents, conversation_history)
 
             logger.info(f"Generating response for query: {query[:50]}...")
 
@@ -181,16 +197,21 @@ ANSWER:"""
                 "metadata": {}
             }
 
-    def generate_simple_response(self, query: str) -> Dict[str, Any]:
+    def generate_simple_response(
+        self,
+        query: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         """Generate a simple response without RAG context.
 
         Args:
             query: User's query
+            conversation_history: Optional conversation history for context
 
         Returns:
             Dictionary with response and metadata
         """
-        return self.generate_response(query, [])
+        return self.generate_response(query, [], conversation_history)
 
     def summarize_content(self, content: str, max_length: int = 200) -> str:
         """Generate a summary of content.
