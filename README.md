@@ -10,6 +10,7 @@ A powerful command-line tool for scraping web content and querying it using Retr
 - **RAG-Powered Q&A**: Ask questions about scraped content with context-aware responses
 - **Conversation Memory**: Multi-turn conversations with context retention and history
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, and OpenRouter APIs
+- **Web Interface**: Modern React-based web UI with real-time updates
 - **Rich CLI Interface**: Beautiful command-line interface with progress indicators
 - **Persistent Storage**: Your scraped content and conversations are saved locally
 
@@ -24,8 +25,20 @@ cd scrape
 ```
 
 2. Install dependencies:
+
+**Option A: Full installation (recommended)**
 ```bash
 pip install -r requirements.txt
+```
+
+**Option B: If you encounter version conflicts**
+```bash
+pip install -r requirements-minimal.txt
+```
+
+**Option C: Core functionality only**
+```bash
+pip install -r requirements-core.txt
 ```
 
 3. Set up environment variables (optional):
@@ -64,7 +77,51 @@ python main.py status
 python main.py collections
 ```
 
-## 📖 Commands
+## 🌐 Web Interface
+
+ScrapeSET now includes a modern web interface built with React and FastAPI!
+
+### Starting the Web Interface
+
+1. **Install frontend dependencies** (first time only):
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+2. **Start the web server**:
+```bash
+python web_server.py
+```
+
+3. **Start the frontend** (in another terminal):
+```bash
+cd frontend
+npm run dev
+```
+
+4. **Access the application**:
+- Web Interface: http://localhost:3000
+- API Documentation: http://localhost:8000/docs
+
+### Web Interface Features
+
+- **📊 Dashboard**: Overview of collections, statistics, and quick actions
+- **🌐 Web Scraping**: Interactive URL scraping with text element selection
+- **📚 Collections**: Visual management with clear documents vs drop collection options
+- **💬 Chat Interface**: Real-time conversations with RAG-powered responses
+- **📝 Conversation History**: View and manage saved chat sessions
+- **⚙️ Settings**: Configure LLM providers, embedding models, and processing options
+
+The web interface provides all CLI functionality in an intuitive, visual format with:
+- Real-time progress updates
+- Interactive element selection
+- Source citation in chat responses
+- Responsive design for all devices
+- Conversation memory with session management
+
+## 📖 CLI Commands
 
 ### `scrape`
 Scrape a website and add content to your vector store.
@@ -180,24 +237,35 @@ python main.py conversations --delete abc123de
 ```
 
 ### `clear`
-Clear documents from the vector store.
+Clear documents from the vector store or drop entire collections.
 
 ```bash
 python main.py clear [OPTIONS]
 ```
 
 **Options:**
-- `--collection TEXT`: Collection name to clear
+- `--collection TEXT`: Collection name to operate on
 - `--url TEXT`: Clear only documents from a specific URL
+- `--drop`: Drop the entire collection instead of just clearing documents
 
 **Examples:**
 ```bash
-# Clear all documents
+# Clear all documents from collection (keeps collection structure)
 python main.py clear
 
 # Clear documents from specific URL
 python main.py clear --url https://example.com
+
+# Drop entire collection (completely removes collection)
+python main.py clear --drop
+
+# Drop specific collection
+python main.py clear --collection my_collection --drop
 ```
+
+**Important:**
+- **Clear**: Removes all documents but keeps the collection structure
+- **Drop**: Completely removes the collection and all its documents (cannot be undone)
 
 ## ⚙️ Configuration
 
@@ -343,6 +411,73 @@ Run the test suite:
 ```bash
 python -m pytest tests/ -v
 ```
+
+## 🛠️ Troubleshooting
+
+### Installation Issues
+
+**Problem**: Dependency version conflicts during `pip install`
+
+**Solutions**:
+1. Use a fresh virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements-minimal.txt
+   ```
+
+2. Update pip and try again:
+   ```bash
+   pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+3. Install core dependencies only:
+   ```bash
+   pip install -r requirements-core.txt
+   ```
+
+### Common Runtime Issues
+
+**Problem**: "ChromaDB collection not found" errors
+
+**Solution**: The collection will be created automatically on first use. If issues persist, clear the data directory:
+```bash
+rm -rf ./data/chroma_db
+```
+
+**Problem**: LLM API errors
+
+**Solutions**:
+1. Check your API keys in `.env` file
+2. Verify your account has sufficient credits
+3. Try a different model or provider
+
+**Problem**: Web interface not loading
+
+**Solutions**:
+1. Make sure both backend and frontend are running:
+   ```bash
+   # Terminal 1: Backend
+   python web_server.py
+
+   # Terminal 2: Frontend
+   cd frontend && npm run dev
+   ```
+
+2. Check for port conflicts (default: backend 8000, frontend 3000)
+
+### Collection Management
+
+**Problem**: Understanding the difference between Clear vs Drop operations
+
+**Solution**:
+- **Clear Documents** (`python main.py clear`): Removes all documents from the collection but keeps the collection structure. You can add new documents to the same collection later.
+- **Drop Collection** (`python main.py clear --drop`): Completely removes the collection and all its documents from ChromaDB. The collection structure is permanently deleted.
+
+**Use Cases**:
+- Use **Clear** when you want to refresh the content but keep using the same collection
+- Use **Drop** when you want to completely remove a collection you no longer need
 
 ## 📝 Tech Stack
 

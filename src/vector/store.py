@@ -216,6 +216,27 @@ class VectorStore:
             logger.error(f"Failed to clear collection: {e}")
             return False
 
+    def drop_collection(self) -> bool:
+        """Completely remove the collection from ChromaDB.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self.client.delete_collection(self.collection_name)
+            logger.info(f"Dropped collection: {self.collection_name}")
+            return True
+
+        except ValueError as e:
+            if "does not exist" in str(e):
+                logger.warning(f"Collection {self.collection_name} does not exist")
+                return True  # Consider it successful if already gone
+            logger.error(f"Failed to drop collection: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to drop collection: {e}")
+            return False
+
     def delete_by_url(self, source_url: str) -> bool:
         """Delete all documents from a specific source URL.
 
