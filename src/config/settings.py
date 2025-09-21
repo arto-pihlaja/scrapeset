@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from decouple import config
 
 
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
         default="./data/chroma_db"
     )
     collection_name: str = config("COLLECTION_NAME", default="scraped_content")
+    embedding_model: str = config("EMBEDDING_MODEL", default="default")
 
     # Scraping Configuration
     request_timeout: int = config("REQUEST_TIMEOUT", default=30, cast=int)
@@ -42,9 +44,10 @@ class Settings(BaseSettings):
     log_level: str = config("LOG_LEVEL", default="INFO")
     log_file: str = config("LOG_FILE", default="./logs/scraper.log")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 # Global settings instance
