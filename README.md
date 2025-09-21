@@ -1,4 +1,6 @@
-This is a project to scrape text from the web and analyse it using an LLM. 
+# scrapeset
+
+This is a project to scrape text from the web and analyse it using an LLM.
 Implementation proceeds in iterations. We'll use Git branches for new features.
 
 Initial idea for tech stack:
