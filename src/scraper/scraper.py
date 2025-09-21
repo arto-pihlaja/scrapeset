@@ -93,9 +93,11 @@ class WebScraper:
 
             for element in elements:
                 text = self._extract_clean_text(element)
-                if len(text) >= settings.min_text_length:
+                words = text.split()
+
+                # Filter by both character length and word count
+                if len(text) >= settings.min_text_length and len(words) >= settings.min_word_count:
                     # Generate preview (first N words)
-                    words = text.split()
                     preview = ' '.join(words[:settings.text_preview_words])
                     if len(words) > settings.text_preview_words:
                         preview += "..."

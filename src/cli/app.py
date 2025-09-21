@@ -1,6 +1,7 @@
 """CLI application for web scraping and RAG queries."""
 
 from typing import List, Optional
+from pathlib import Path
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -13,6 +14,7 @@ from src.scraper import WebScraper, ScrapedContent
 from src.text import TextProcessor
 from src.vector import VectorStore
 from src.llm import LLMClient
+from src.conversation import ConversationMemory
 from src.utils.logger import setup_logging, get_logger
 
 # Initialize Rich console and logger
@@ -199,16 +201,29 @@ def create_app() -> typer.Typer:
     @app.command()
     def chat(
         collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
-        n_results: int = typer.Option(5, "--results", help="Number of context documents to retrieve")
+        n_results: int = typer.Option(5, "--results", help="Number of context documents to retrieve"),
+        memory: bool = typer.Option(True, "--memory/--no-memory", help="Enable conversation memory"),
+        save_conversation: bool = typer.Option(None, "--save/--no-save", help="Save conversation to file")
     ):
-        """Start an interactive chat session."""
+        """Start an interactive chat session with conversation memory."""
 
         console.print(f"\n[bold green]Interactive Chat Mode[/bold green]")
-        console.print("Type 'quit', 'exit', or press Ctrl+C to end the session\n")
+        console.print("Type 'quit', 'exit', 'clear', or press Ctrl+C to end the session")
 
         # Initialize components
         vector_store = VectorStore(collection_name=collection)
         llm_client = LLMClient()
+
+        # Initialize conversation memory
+        conversation = ConversationMemory() if memory else None
+
+        # Use configured save setting if not specified
+        if save_conversation is None:
+            save_conversation = settings.conversation_persistence
+
+        if conversation:
+            console.print(f"[dim]Conversation memory enabled (session: {conversation.session_id})[/dim]")
+        console.print("")
 
         # Check if collection has content
         stats = vector_store.get_collection_stats()
@@ -225,20 +240,65 @@ def create_app() -> typer.Typer:
                 if question.lower() in ['quit', 'exit', 'q']:
                     console.print("[green]Goodbye![/green]")
                     break
+                elif question.lower() == 'clear':
+                    if conversation:
+                        conversation.clear_history()
+                        console.print("[yellow]Conversation history cleared.[/yellow]")
+                    else:
+                        console.print("[yellow]Conversation memory is disabled.[/yellow]")
+                    continue
+                elif question.lower() == 'history':
+                    if conversation and len(conversation) > 0:
+                        console.print(f"\n[bold]Conversation History ({len(conversation)} messages):[/bold]")
+                        for i, msg in enumerate(conversation.get_messages(), 1):
+                            role_color = "cyan" if msg.role == "user" else "green"
+                            console.print(f"[{role_color}]{i}. {msg.role.title()}:[/{role_color}] {msg.content[:100]}...")
+                    else:
+                        console.print("[yellow]No conversation history available.[/yellow]")
+                    continue
+
+                # Add user message to conversation memory
+                if conversation:
+                    conversation.add_user_message(question)
 
                 # Retrieve context and generate response
                 context_docs = vector_store.search(question, n_results=n_results) if stats['document_count'] > 0 else []
-                result = llm_client.generate_response(question, context_docs)
+
+                # Get conversation history for LLM context
+                conversation_history = None
+                if conversation:
+                    # Get recent conversation context (exclude the current question)
+                    recent_context = conversation.get_recent_context(max_pairs=3)
+                    # Remove the last message (current question) as it's passed separately
+                    conversation_history = recent_context[:-1] if recent_context else None
+
+                result = llm_client.generate_response(question, context_docs, conversation_history)
 
                 # Display response
                 if result['success']:
                     console.print(f"\n[bold green]Answer:[/bold green]")
                     console.print(Panel(result['response'], border_style="green"))
+
+                    # Add assistant response to conversation memory
+                    if conversation:
+                        conversation.add_assistant_message(result['response'])
+
+                    # Show sources if available
+                    if result['metadata']['sources']:
+                        console.print(f"\n[dim]Sources: {len(result['metadata']['sources'])} documents used[/dim]")
                 else:
                     console.print(f"[bold red]Error:[/bold red] {result.get('error', 'Unknown error')}")
 
         except KeyboardInterrupt:
             console.print("\n[green]Goodbye![/green]")
+
+        finally:
+            # Save conversation if enabled and has content
+            if conversation and save_conversation and len(conversation) > 0:
+                if conversation.save_to_file():
+                    console.print(f"[dim]Conversation saved (session: {conversation.session_id})[/dim]")
+                else:
+                    console.print(f"[dim]Failed to save conversation[/dim]")
 
     @app.command()
     def status(
@@ -304,6 +364,92 @@ def create_app() -> typer.Typer:
 
         # Show current default collection
         console.print(f"\n[dim]Default collection: {settings.collection_name}[/dim]")
+
+    @app.command()
+    def conversations(
+        list_saved: bool = typer.Option(False, "--list", help="List saved conversations"),
+        load: Optional[str] = typer.Option(None, "--load", help="Load conversation by session ID"),
+        delete: Optional[str] = typer.Option(None, "--delete", help="Delete conversation by session ID")
+    ):
+        """Manage saved conversations."""
+
+        conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+
+        if list_saved:
+            # List all saved conversations
+            if not conversations_dir.exists():
+                console.print("[yellow]No conversations directory found.[/yellow]")
+                return
+
+            conversation_files = list(conversations_dir.glob("conversation_*.json"))
+            if not conversation_files:
+                console.print("[yellow]No saved conversations found.[/yellow]")
+                return
+
+            console.print(f"\n[bold green]Saved Conversations[/bold green]")
+            console.print(f"Directory: {conversations_dir}")
+
+            table = Table(show_header=True, header_style="bold magenta")
+            table.add_column("Session ID", style="cyan", no_wrap=True)
+            table.add_column("Messages", justify="right", style="green")
+            table.add_column("Created", style="blue")
+            table.add_column("Duration", style="yellow")
+
+            for file_path in sorted(conversation_files):
+                try:
+                    conversation = ConversationMemory.load_from_file(file_path)
+                    if conversation:
+                        stats = conversation.get_stats()
+                        table.add_row(
+                            stats['session_id'],
+                            str(stats['total_messages']),
+                            stats['created_at'][:19],  # Truncate timestamp
+                            stats['duration']
+                        )
+                except Exception as e:
+                    console.print(f"[red]Error loading {file_path.name}: {e}[/red]")
+
+            console.print(table)
+
+        elif load:
+            # Load and display a specific conversation
+            file_path = conversations_dir / f"conversation_{load}.json"
+            if not file_path.exists():
+                console.print(f"[red]Conversation {load} not found.[/red]")
+                return
+
+            conversation = ConversationMemory.load_from_file(file_path)
+            if not conversation:
+                console.print(f"[red]Failed to load conversation {load}.[/red]")
+                return
+
+            console.print(f"\n[bold green]Conversation {load}[/bold green]")
+            stats = conversation.get_stats()
+            console.print(f"Messages: {stats['total_messages']}, Created: {stats['created_at'][:19]}")
+
+            for i, msg in enumerate(conversation.get_messages(), 1):
+                role_color = "cyan" if msg.role == "user" else "green"
+                console.print(f"\n[{role_color}]{i}. {msg.role.title()} ({msg.timestamp.strftime('%H:%M:%S')}):[/{role_color}]")
+                console.print(Panel(msg.content, border_style="dim"))
+
+        elif delete:
+            # Delete a specific conversation
+            file_path = conversations_dir / f"conversation_{delete}.json"
+            if not file_path.exists():
+                console.print(f"[red]Conversation {delete} not found.[/red]")
+                return
+
+            confirm = Confirm.ask(f"Delete conversation {delete}?", default=False)
+            if confirm:
+                try:
+                    file_path.unlink()
+                    console.print(f"[green]✓ Deleted conversation {delete}[/green]")
+                except Exception as e:
+                    console.print(f"[red]✗ Failed to delete conversation: {e}[/red]")
+
+        else:
+            # Show usage help
+            console.print("[yellow]Use --list to see saved conversations, --load <id> to view, or --delete <id> to remove.[/yellow]")
 
     @app.command()
     def clear(

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Text Processing
     min_text_length: int = config("MIN_TEXT_LENGTH", default=300, cast=int)
+    min_word_count: int = config("MIN_WORD_COUNT", default=100, cast=int)
     text_preview_words: int = config("TEXT_PREVIEW_WORDS", default=50, cast=int)
     chunk_size: int = config("CHUNK_SIZE", default=1000, cast=int)
     chunk_overlap: int = config("CHUNK_OVERLAP", default=200, cast=int)
@@ -39,6 +40,11 @@ class Settings(BaseSettings):
         "USER_AGENT",
         default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     )
+
+    # Conversation Memory
+    conversation_memory_size: int = config("CONVERSATION_MEMORY_SIZE", default=5, cast=int)
+    conversation_persistence: bool = config("CONVERSATION_PERSISTENCE", default=False, cast=bool)
+    conversation_context_ratio: float = config("CONVERSATION_CONTEXT_RATIO", default=0.3, cast=float)
 
     # Logging
     log_level: str = config("LOG_LEVEL", default="INFO")

@@ -44,17 +44,19 @@
    - End-to-end CLI functionality verified
    - Error case handling implemented
 
-## 🎯 First Simple Version Complete!
+## 🎯 Enhanced RAG Tool with Conversation Memory Complete!
 
-The first simple version of web scraping + RAG is now **complete** and **functional**:
+The web scraping + RAG tool with conversation memory is now **complete** and **fully functional**:
 
 ### Features Implemented:
 1. **Web Scraping**: User can input a URL, scraper extracts text content with filtering
 2. **Text Selection**: Interactive CLI allows user to review and select text elements
 3. **Vector Storage**: Selected content is chunked and stored in ChromaDB with embeddings
 4. **RAG Queries**: Users can ask questions about scraped content with context retrieval
-5. **Interactive Chat**: Continuous Q&A session mode
-6. **Status Management**: View collection status, sources, and clear data
+5. **Conversation Memory**: Multi-turn conversations with context retention and history
+6. **Interactive Chat**: Continuous Q&A session mode with memory and persistence
+7. **Collection Management**: View collection status, sources, and manage multiple collections
+8. **Conversation Management**: Save, load, view, and delete conversation histories
 
 ### Usage Examples:
 ```bash
@@ -64,8 +66,23 @@ python main.py scrape https://example.com
 # Ask questions about scraped content
 python main.py query "What is the main topic?"
 
-# Start interactive chat session
+# Start interactive chat session with memory
 python main.py chat
+
+# Start chat without memory
+python main.py chat --no-memory
+
+# Chat with auto-save enabled
+python main.py chat --save
+
+# List all collections
+python main.py collections
+
+# List saved conversations
+python main.py conversations --list
+
+# View a specific conversation
+python main.py conversations --load abc123de
 
 # Check collection status
 python main.py status
@@ -75,10 +92,12 @@ python main.py clear
 ```
 
 ### Technical Architecture:
-- **Modular Design**: Separate modules for scraping, text processing, vector storage, and LLM
-- **Configuration**: Environment-based settings with defaults
+- **Modular Design**: Separate modules for scraping, text processing, vector storage, LLM, and conversation memory
+- **Conversation Memory**: Multi-turn context retention with configurable memory size and persistence
+- **Enhanced RAG**: Context-aware responses combining vector search with conversation history
+- **Configuration**: Environment-based settings with defaults for all components
 - **Error Handling**: Comprehensive error handling and logging
-- **Testing**: Unit tests for core functionality
+- **Testing**: Unit tests for core functionality including conversation memory
 - **CLI**: User-friendly command-line interface with Rich formatting
 
 ## 🚀 Next Steps (Future Iterations)
