@@ -201,6 +201,7 @@ def create_app() -> typer.Typer:
     @app.command()
     def chat(
         collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
+        collections: Optional[List[str]] = typer.Option(None, "--collections", help="Multiple collection names (comma-separated)"),
         n_results: int = typer.Option(5, "--results", help="Number of context documents to retrieve"),
         memory: bool = typer.Option(True, "--memory/--no-memory", help="Enable conversation memory"),
         save_conversation: bool = typer.Option(None, "--save/--no-save", help="Save conversation to file")
@@ -210,8 +211,18 @@ def create_app() -> typer.Typer:
         console.print(f"\n[bold green]Interactive Chat Mode[/bold green]")
         console.print("Type 'quit', 'exit', 'clear', or press Ctrl+C to end the session")
 
+        # Determine collections to use
+        collections_to_use = []
+        if collections:
+            collections_to_use = collections
+        elif collection:
+            collections_to_use = [collection]
+        else:
+            # Use default collection
+            vector_store = VectorStore()
+            collections_to_use = [vector_store.collection_name]
+
         # Initialize components
-        vector_store = VectorStore(collection_name=collection)
         llm_client = LLMClient()
 
         # Initialize conversation memory
@@ -223,14 +234,27 @@ def create_app() -> typer.Typer:
 
         if conversation:
             console.print(f"[dim]Conversation memory enabled (session: {conversation.session_id})[/dim]")
+
+        # Show collection info
+        if len(collections_to_use) == 1:
+            console.print(f"[dim]Using collection: {collections_to_use[0]}[/dim]")
+        else:
+            console.print(f"[dim]Using {len(collections_to_use)} collections: {', '.join(collections_to_use)}[/dim]")
         console.print("")
 
-        # Check if collection has content
-        stats = vector_store.get_collection_stats()
-        console.print(f"Vector store contains {stats['document_count']} documents")
+        # Check if collections have content
+        total_documents = 0
+        for collection_name in collections_to_use:
+            try:
+                vector_store = VectorStore(collection_name=collection_name)
+                stats = vector_store.get_collection_stats()
+                total_documents += stats['document_count']
+                console.print(f"Collection '{collection_name}': {stats['document_count']} documents")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not access collection '{collection_name}': {e}[/yellow]")
 
-        if stats['document_count'] == 0:
-            console.print("[yellow]No content in vector store. You can still ask general questions.[/yellow]")
+        if total_documents == 0:
+            console.print("[yellow]No content in vector stores. You can still ask general questions.[/yellow]")
 
         try:
             while True:
@@ -262,7 +286,32 @@ def create_app() -> typer.Typer:
                     conversation.add_user_message(question)
 
                 # Retrieve context and generate response
-                context_docs = vector_store.search(question, n_results=n_results) if stats['document_count'] > 0 else []
+                context_docs = []
+                if total_documents > 0:
+                    if len(collections_to_use) == 1:
+                        # Single collection search
+                        vector_store = VectorStore(collection_name=collections_to_use[0])
+                        context_docs = vector_store.search(question, n_results=n_results)
+                    else:
+                        # Multi-collection search
+                        all_results = []
+                        results_per_col = max(1, n_results // len(collections_to_use))
+
+                        for collection_name in collections_to_use:
+                            try:
+                                vector_store = VectorStore(collection_name=collection_name)
+                                search_results = vector_store.search(question, n_results=results_per_col)
+
+                                # Add collection name to metadata
+                                for result in search_results:
+                                    result["metadata"]["source_collection"] = collection_name
+                                    all_results.append(result)
+                            except Exception as e:
+                                console.print(f"[yellow]Warning: Failed to search collection '{collection_name}': {e}[/yellow]")
+
+                        # Sort by similarity and take top results
+                        all_results.sort(key=lambda x: x["distance"])
+                        context_docs = all_results[:n_results]
 
                 # Get conversation history for LLM context
                 conversation_history = None
@@ -285,7 +334,21 @@ def create_app() -> typer.Typer:
 
                     # Show sources if available
                     if result['metadata']['sources']:
-                        console.print(f"\n[dim]Sources: {len(result['metadata']['sources'])} documents used[/dim]")
+                        sources_text = f"\n[dim]Sources: {len(result['metadata']['sources'])} documents used"
+                        if len(collections_to_use) > 1:
+                            # Show collection breakdown for multi-collection search
+                            collection_counts = {}
+                            for doc in context_docs:
+                                if 'source_collection' in doc['metadata']:
+                                    coll = doc['metadata']['source_collection']
+                                    collection_counts[coll] = collection_counts.get(coll, 0) + 1
+
+                            if collection_counts:
+                                breakdown = ', '.join([f"{coll}: {count}" for coll, count in collection_counts.items()])
+                                sources_text += f" ({breakdown})"
+
+                        sources_text += "[/dim]"
+                        console.print(sources_text)
                 else:
                     console.print(f"[bold red]Error:[/bold red] {result.get('error', 'Unknown error')}")
 
@@ -454,11 +517,16 @@ def create_app() -> typer.Typer:
     @app.command()
     def clear(
         collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
-        url: Optional[str] = typer.Option(None, "--url", help="Clear only documents from specific URL")
+        url: Optional[str] = typer.Option(None, "--url", help="Clear only documents from specific URL"),
+        drop: bool = typer.Option(False, "--drop", help="Drop the entire collection instead of just clearing documents")
     ):
-        """Clear documents from the vector store."""
+        """Clear documents from the vector store or drop the entire collection."""
 
         vector_store = VectorStore(collection_name=collection)
+
+        if url and drop:
+            console.print("[red]✗ Cannot use --url and --drop together. --drop operates on entire collections.[/red]")
+            return
 
         if url:
             confirm = Confirm.ask(f"Clear all documents from URL: {url}?", default=False)
@@ -468,6 +536,16 @@ def create_app() -> typer.Typer:
                     console.print(f"[green]✓ Cleared documents from {url}[/green]")
                 else:
                     console.print(f"[red]✗ Failed to clear documents from {url}[/red]")
+        elif drop:
+            console.print(f"[bold red]WARNING:[/bold red] This will completely remove the collection '{vector_store.collection_name}' and all its documents.")
+            console.print("[yellow]This action cannot be undone![/yellow]")
+            confirm = Confirm.ask(f"DROP the entire collection '{vector_store.collection_name}'?", default=False)
+            if confirm:
+                success = vector_store.drop_collection()
+                if success:
+                    console.print(f"[green]✓ Dropped collection '{vector_store.collection_name}'[/green]")
+                else:
+                    console.print(f"[red]✗ Failed to drop collection[/red]")
         else:
             confirm = Confirm.ask(f"Clear ALL documents from collection '{vector_store.collection_name}'?", default=False)
             if confirm:

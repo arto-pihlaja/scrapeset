@@ -1,0 +1,33 @@
+# Core dependencies for ScrapeSET
+# Use this file if you encounter version conflicts with requirements.txt
+
+# Web scraping
+requests
+beautifulsoup4
+urllib3
+
+# LLM and AI (unified interface)
+litellm
+openai
+
+# Vector database
+chromadb
+
+# Text processing
+tiktoken
+
+# Configuration and environment
+python-decouple
+pydantic
+pydantic-settings
+
+# Web framework
+fastapi
+uvicorn
+
+# CLI interface
+typer
+rich
+
+# Utilities
+loguru
