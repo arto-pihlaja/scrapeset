@@ -28,17 +28,24 @@ cd scrape
 
 **Option A: Full installation (recommended)**
 ```bash
-pip install -r requirements.txt
+# Create a virtual environment
+uv venv
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+uv pip install -r requirements.txt
 ```
 
 **Option B: If you encounter version conflicts**
 ```bash
-pip install -r requirements-minimal.txt
+uv pip install -r requirements-minimal.txt
 ```
 
 **Option C: Core functionality only**
 ```bash
-pip install -r requirements-core.txt
+uv pip install -r requirements-core.txt
 ```
 
 3. Set up environment variables (optional):
@@ -53,28 +60,28 @@ OPENROUTER_API_KEY=your_openrouter_key
 
 1. **Scrape a website**:
 ```bash
-python main.py scrape https://example.com
+uv run python main.py scrape https://example.com
 ```
 The tool will extract text elements and let you choose which ones to include.
 
 2. **Ask questions about the content**:
 ```bash
-python main.py query "What is the main topic of this article?"
+uv run python main.py query "What is the main topic of this article?"
 ```
 
 3. **Start an interactive chat session**:
 ```bash
-python main.py chat
+uv run python main.py chat
 ```
 
 4. **Check your collection status**:
 ```bash
-python main.py status
+uv run python main.py status
 ```
 
 5. **List all collections**:
 ```bash
-python main.py collections
+uv run python main.py collections
 ```
 
 ## 🌐 Web Interface
@@ -92,7 +99,7 @@ cd ..
 
 2. **Start the web server**:
 ```bash
-python web_server.py
+uv run python web_server.py
 ```
 
 3. **Start the frontend** (in another terminal):
@@ -137,13 +144,13 @@ python main.py scrape URL [OPTIONS]
 **Example:**
 ```bash
 # Interactive scraping (default)
-python main.py scrape https://python.org
+uv run python main.py scrape https://python.org
 
 # Auto-include all text elements
-python main.py scrape https://python.org --auto
+uv run python main.py scrape https://python.org --auto
 
 # Use custom collection
-python main.py scrape https://python.org --collection python_docs
+uv run python main.py scrape https://python.org --collection python_docs
 ```
 
 ### `query`
@@ -159,8 +166,8 @@ python main.py query "YOUR QUESTION" [OPTIONS]
 
 **Example:**
 ```bash
-python main.py query "What are the main features mentioned?"
-python main.py query "Explain the installation process" --results 3
+uv run python main.py query "What are the main features mentioned?"
+uv run python main.py query "Explain the installation process" --results 3
 ```
 
 ### `chat`
@@ -184,13 +191,13 @@ python main.py chat [OPTIONS]
 **Example:**
 ```bash
 # Chat with memory enabled (default)
-python main.py chat
+uv run python main.py chat
 
 # Chat without memory
-python main.py chat --no-memory
+uv run python main.py chat --no-memory
 
 # Chat with auto-save enabled
-python main.py chat --save
+uv run python main.py chat --save
 ```
 
 ### `status`
@@ -227,13 +234,13 @@ python main.py conversations [OPTIONS]
 **Examples:**
 ```bash
 # List all saved conversations
-python main.py conversations --list
+uv run python main.py conversations --list
 
 # View a specific conversation
-python main.py conversations --load abc123de
+uv run python main.py conversations --load abc123de
 
 # Delete a conversation
-python main.py conversations --delete abc123de
+uv run python main.py conversations --delete abc123de
 ```
 
 ### `clear`
@@ -251,16 +258,16 @@ python main.py clear [OPTIONS]
 **Examples:**
 ```bash
 # Clear all documents from collection (keeps collection structure)
-python main.py clear
+uv run python main.py clear
 
 # Clear documents from specific URL
-python main.py clear --url https://example.com
+uv run python main.py clear --url https://example.com
 
 # Drop entire collection (completely removes collection)
-python main.py clear --drop
+uv run python main.py clear --drop
 
 # Drop specific collection
-python main.py clear --collection my_collection --drop
+uv run python main.py clear --collection my_collection --drop
 ```
 
 **Important:**
@@ -373,10 +380,10 @@ EMBEDDING_MODEL=sentence-transformers/all-distilroberta-v1
 
 ```bash
 # Use OpenAI embeddings
-EMBEDDING_MODEL=openai OPENAI_API_KEY=your_key python main.py scrape https://example.com
+EMBEDDING_MODEL=openai OPENAI_API_KEY=your_key uv run python main.py scrape https://example.com
 
 # Use high-quality sentence transformers
-EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2 python main.py scrape https://example.com
+EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2 uv run python main.py scrape https://example.com
 ```
 
 **Note:** Different embedding models create incompatible vector spaces. Use `python main.py clear` when switching embedding models.
@@ -409,7 +416,7 @@ src/
 Run the test suite:
 
 ```bash
-python -m pytest tests/ -v
+uv run python -m pytest tests/ -v
 ```
 
 ## 🛠️ Troubleshooting
@@ -419,22 +426,21 @@ python -m pytest tests/ -v
 **Problem**: Dependency version conflicts during `pip install`
 
 **Solutions**:
-1. Use a fresh virtual environment:
+1. Use a fresh virtual environment with uv:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   pip install -r requirements-minimal.txt
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv pip install -r requirements-minimal.txt
    ```
 
-2. Update pip and try again:
+2. Update dependencies and try again:
    ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
+   uv pip install -r requirements.txt
    ```
 
 3. Install core dependencies only:
    ```bash
-   pip install -r requirements-core.txt
+   uv pip install -r requirements-core.txt
    ```
 
 ### Common Runtime Issues
@@ -459,7 +465,7 @@ rm -rf ./data/chroma_db
 1. Make sure both backend and frontend are running:
    ```bash
    # Terminal 1: Backend
-   python web_server.py
+   uv run python web_server.py
 
    # Terminal 2: Frontend
    cd frontend && npm run dev
@@ -472,8 +478,8 @@ rm -rf ./data/chroma_db
 **Problem**: Understanding the difference between Clear vs Drop operations
 
 **Solution**:
-- **Clear Documents** (`python main.py clear`): Removes all documents from the collection but keeps the collection structure. You can add new documents to the same collection later.
-- **Drop Collection** (`python main.py clear --drop`): Completely removes the collection and all its documents from ChromaDB. The collection structure is permanently deleted.
+- **Clear Documents** (`uv run python main.py clear`): Removes all documents from the collection but keeps the collection structure. You can add new documents to the same collection later.
+- **Drop Collection** (`uv run python main.py clear --drop`): Completely removes the collection and all its documents from ChromaDB. The collection structure is permanently deleted.
 
 **Use Cases**:
 - Use **Clear** when you want to refresh the content but keep using the same collection
