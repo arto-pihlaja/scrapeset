@@ -1,0 +1,30 @@
+2026-01-02 17:39:08.654 | INFO     | src.scraper.transcriber:process_video:210 - Detected YouTube ID: dQw4w9WgXcQ. Checking for existing transcripts and metadata...
+Testing YouTube extraction...
+YouTube ID: dQw4w9WgXcQ
+fetch_youtube_transcript returned metadata for: None
+Result length: 2119
+Result snippet: [Source: YouTube Transcript]
+
+[♪♪♪] ♪ We're no strangers to love ♪ ♪ You know the rules
+and so do I ♪ ♪ A full commitment's
+what I'm thinking of ♪ ♪ You wouldn't get this
+from any other guy ♪ ♪ I just...
+Testing analysis pipeline...
+Traceback (most recent call last):
+  File "/mnt/data/dev/scrapeset/tests/verify_analysis.py", line 48, in <module>
+    asyncio.run(test_analysis_pipeline())
+  File "/usr/lib/python3.10/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/usr/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/mnt/data/dev/scrapeset/tests/verify_analysis.py", line 26, in test_analysis_pipeline
+    crew = AnalysisCrew()
+  File "/mnt/data/dev/scrapeset/src/analysis/crew.py", line 69, in __init__
+    self.agents = create_all_agents()
+  File "/mnt/data/dev/scrapeset/src/analysis/agents.py", line 146, in create_all_agents
+    "fetcher": create_fetcher_agent(),
+  File "/mnt/data/dev/scrapeset/src/analysis/agents.py", line 67, in create_fetcher_agent
+    llm=get_llm(),
+  File "/mnt/data/dev/scrapeset/src/analysis/agents.py", line 50, in get_llm
+    logger.info(f"Using LLM: {model} with provider: {provider}")
+NameError: name 'logger' is not defined

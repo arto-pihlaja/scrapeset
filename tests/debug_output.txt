@@ -1,0 +1,7 @@
+Failed to fetch English transcript: type object 'YouTubeTranscriptApi' has no attribute 'list_transcripts'
+Testing direct YouTubeTranscriptApi for dQw4w9WgXcQ...
+Direct API failed: type object 'YouTubeTranscriptApi' has no attribute 'list_transcripts'
+--------------------
+Testing YouTubeMetadataTool for https://www.youtube.com/watch?v=dQw4w9WgXcQ...
+Tool failed to get transcript. Error: type object 'YouTubeTranscriptApi' has no attribute 'get_transcript'
+Metadata: Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster), Rick Astley

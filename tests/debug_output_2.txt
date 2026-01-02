@@ -1,0 +1,15 @@
+Testing direct YouTubeTranscriptApi for dQw4w9WgXcQ...
+YouTubeTranscriptApi class: <class 'youtube_transcript_api._api.YouTubeTranscriptApi'>
+Has list: True
+Has list_transcripts: False
+Has get_transcript: False
+Has fetch: True
+Instance has list: True
+Instance has list_transcripts: False
+Instance has get_transcript: False
+Instance has fetch: True
+ytt.list(video_id) worked!
+--------------------
+Testing YouTubeMetadataTool for https://www.youtube.com/watch?v=dQw4w9WgXcQ...
+Tool failed to get transcript. Error: 'FetchedTranscriptSnippet' object is not subscriptable
+Metadata: Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster), Rick Astley

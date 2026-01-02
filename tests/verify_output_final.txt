@@ -1,0 +1,244 @@
+2026-01-02 17:37:22.579 | INFO     | src.scraper.transcriber:process_video:210 - Detected YouTube ID: dQw4w9WgXcQ. Checking for existing transcripts and metadata...
+Testing YouTube extraction...
+YouTube ID: dQw4w9WgXcQ
+fetch_youtube_transcript returned metadata for: None
+Result length: 2119
+Result snippet: [Source: YouTube Transcript]
+
+[♪♪♪] ♪ We're no strangers to love ♪ ♪ You know the rules
+and so do I ♪ ♪ A full commitment's
+what I'm thinking of ♪ ♪ You wouldn't get this
+from any other guy ♪ ♪ I just...
+Testing analysis pipeline...
+Fetch done.
+╭──── Crew Execution Started ─────╮
+│                                 │
+│  Crew Execution Started         │
+│  Name: crew                     │
+│  ID:                            │
+│  7b18b50e-acc1-4fc9-9f8f-3589c  │
+│  de98949                        │
+│  Tool Args:                     │
+│                                 │
+│                                 │
+╰─────────────────────────────────╯
+
+🚀 Crew: crew
+└── 📋 Task: 
+    3760119a-a326-4aa2-bb36-e071a93
+    c457a
+    Status: Executing Task...╭─────── 🤖 Agent Started ────────╮
+│                                 │
+│  Agent: Information Analyst     │
+│                                 │
+│  Task: Assess the credibility   │
+│  of this source:                │
+│  Title: Google                  │
+│  Type: webpage                  │
+│  URL: https://www.google.com    │
+│  Metadata: {                    │
+│    "author": null,              │
+│    "publish_date": null         │
+│  }                              │
+│                                 │
+│  Content preview:               │
+│  ‪English (United Kingdom)‬       │
+│                                 │
+│  ‪English (United Kingdom)‬       │
+│                                 │
+│  ‪English (United States)‬        │
+│                                 │
+│  ‪Español (Latinoamérica)‬        │
+│                                 │
+│  ‪Português (Portugal)‬           │
+│                                 │
+│  Innan du fortsätter till       │
+│  Google                         │
+│                                 │
+│  leverera och underhålla        │
+│  Googles tjänster               │
+│                                 │
+│  spåra avbrott och skydda mot   │
+│  spam, bedrägeri och otillåten  │
+│  användning                     │
+│                                 │
+│  mäta målgruppsengagemang och   │
+│  webbplatsstatistik så att vi   │
+│  kan analysera hur våra         │
+│  tjänster används och           │
+│  förbättra tjänsternas          │
+│  kvalitet.                      │
+│                                 │
+│  utveckla och förbättra nya     │
+│  tjänster                       │
+│                                 │
+│  leverera annonser och mäta     │
+│  hur effektiva de är            │
+│                                 │
+│  visa anpassat innehåll         │
+│  utifrån dina inställningar     │
+│                                 │
+│  visa anpassade annonser        │
+│  utifrån dina inställningar     │
+│                                 │
+│  Evaluate:                      │
+│  1. Source credibility          │
+│  (high/medium/low/unknown)      │
+│  2. Reasoning for your          │
+│  assessment                     │
+│  3. Potential biases you can    │
+│  identify                       │
+│                                 │
+│  Return as JSON with:           │
+│  - credibility: "high",         │
+│  "medium", "low", or "unknown"  │
+│  - reasoning: string            │
+│  explaining your assessment     │
+│  - potential_biases: array of   │
+│  identified biases              │
+│                                 │
+╰─────────────────────────────────╯
+
+
+❌ Crew: crew
+└── 📋 Task: 
+    3760119a-a326-4aa2-bb36-e071a93
+    c457a
+    Assigned to: Information 
+    Analyst
+    Status: ❌ Failed
+    └── ❌ LLM Failed╭─────────── LLM Error ───────────╮
+│                                 │
+│  ❌ LLM Call Failed             │
+│  Error:                         │
+│  litellm.AuthenticationError:   │
+│  AuthenticationError:           │
+│  OpenrouterException -          │
+│  {"error":{"message":"No        │
+│  cookie auth credentials        │
+│  found","code":401}}            │
+│                                 │
+╰─────────────────────────────────╯
+
+╭───────── Crew Failure ──────────╮
+│                                 │
+│  Crew Execution Failed          │
+│  Name: crew                     │
+│  ID:                            │
+│  7b18b50e-acc1-4fc9-9f8f-3589c  │
+│  de98949                        │
+│  Tool Args:                     │
+│  Final Output:                  │
+│                                 │
+│                                 │
+╰─────────────────────────────────╯
+╭───────── Task Failure ──────────╮
+│                                 │
+│  Task Failed                    │
+│  Name:                          │
+│  3760119a-a326-4aa2-bb36-e071a  │
+│  93c457a                        │
+│  Agent: Information Analyst     │
+│  Tool Args:                     │
+│                                 │
+│                                 │
+╰─────────────────────────────────╯
+Traceback (most recent call last):
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/llm_http_handler.py", line 216, in _make_common_sync_call
+    response = sync_httpx_client.post(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/http_handler.py", line 950, in post
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/http_handler.py", line 932, in post
+    response.raise_for_status()
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://openrouter.ai/api/v1/chat/completions'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/main.py", line 2942, in completion
+    response = base_llm_http_handler.completion(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/llm_http_handler.py", line 519, in completion
+    response = self._make_common_sync_call(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/llm_http_handler.py", line 241, in _make_common_sync_call
+    raise self._handle_error(e=e, provider_config=provider_config)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/llms/custom_httpx/llm_http_handler.py", line 3601, in _handle_error
+    raise provider_config.get_error_class(
+litellm.llms.openrouter.common_utils.OpenRouterException: {"error":{"message":"No cookie auth credentials found","code":401}}
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/data/dev/scrapeset/tests/verify_analysis.py", line 48, in <module>
+    asyncio.run(test_analysis_pipeline())
+  File "/usr/lib/python3.10/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/usr/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/mnt/data/dev/scrapeset/tests/verify_analysis.py", line 35, in test_analysis_pipeline
+    summary_result = crew.run_step("summary", {"content_data": fetch_result})
+  File "/mnt/data/dev/scrapeset/src/analysis/crew.py", line 124, in run_step
+    source_output = self._run_single_task("analyzer", source_task)
+  File "/mnt/data/dev/scrapeset/src/analysis/crew.py", line 84, in _run_single_task
+    result = crew.kickoff()
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/crew.py", line 714, in kickoff
+    result = self._run_sequential_process()
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/crew.py", line 1073, in _run_sequential_process
+    return self._execute_tasks(self.tasks)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/crew.py", line 1159, in _execute_tasks
+    task_output = task.execute_sync(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/task.py", line 458, in execute_sync
+    return self._execute_core(agent, context, tools)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/task.py", line 695, in _execute_core
+    raise e  # Re-raise the exception after emitting the event
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/task.py", line 626, in _execute_core
+    result = agent.execute_task(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agent/core.py", line 411, in execute_task
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agent/core.py", line 389, in execute_task
+    result = self._execute_without_timeout(task_prompt, task)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agent/core.py", line 485, in _execute_without_timeout
+    return self.agent_executor.invoke(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agents/crew_agent_executor.py", line 192, in invoke
+    formatted_answer = self._invoke_loop()
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agents/crew_agent_executor.py", line 291, in _invoke_loop
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/agents/crew_agent_executor.py", line 233, in _invoke_loop
+    answer = get_llm_response(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/utilities/agent_utils.py", line 276, in get_llm_response
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/utilities/agent_utils.py", line 268, in get_llm_response
+    answer = llm.call(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/llm.py", line 1669, in call
+    result = self._handle_non_streaming_response(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/crewai/llm.py", line 1150, in _handle_non_streaming_response
+    response = litellm.completion(**params)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/utils.py", line 1382, in wrapper
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/utils.py", line 1251, in wrapper
+    result = original_function(*args, **kwargs)
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/main.py", line 3973, in completion
+    raise exception_type(
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2329, in exception_type
+    raise e
+  File "/mnt/data/dev/scrapeset/.venv/lib/python3.10/site-packages/litellm/litellm_core_utils/exception_mapping_utils.py", line 2200, in exception_type
+    raise AuthenticationError(
+litellm.exceptions.AuthenticationError: litellm.AuthenticationError: AuthenticationError: OpenrouterException - {"error":{"message":"No cookie auth credentials found","code":401}}
+
+
+╭──────── Tracing Status ─────────╮
+│                                 │
+│  Info: Tracing is disabled.     │
+│                                 │
+│  To enable tracing, do any one  │
+│  of these:                      │
+│  • Set tracing=True in your     │
+│  Crew/Flow code                 │
+│  • Set                          │
+│  CREWAI_TRACING_ENABLED=true    │
+│  in your project's .env file    │
+│  • Run: crewai traces enable    │
+│                                 │
+╰─────────────────────────────────╯
