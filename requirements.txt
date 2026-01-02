@@ -2,8 +2,6 @@
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 requests-cache>=1.1.0
-beautifulsoup4>=4.12.0
-requests-cache>=1.1.0
 playwright>=1.40.0
 # beautifulsoup4 is being replaced but kept for potential legacy compatibility during migration
 
@@ -16,7 +14,7 @@ langchain>=0.1.0
 langchain-community>=0.0.20
 
 # Vector database
-chromadb>=0.4.0
+chromadb>=0.5.23
 
 # Text processing
 tiktoken>=0.5.0
@@ -43,12 +41,11 @@ ruff>=0.1.0
 pre-commit>=3.6.0
 
 # Utilities
-# Utilities
 loguru>=0.7.0
 
 # Dependencies from scraper repo
 trafilatura>=2.0.0
 yt-dlp>=2025.12.8
-youtube-transcript-api==0.6.3
+youtube-transcript-api>=1.2.2
 python-multipart>=0.0.20
-openai>=2.11.0
+openai>=1.58.1,<2.0.0

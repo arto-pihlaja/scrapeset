@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
     Search,
     Loader2,
@@ -8,7 +9,8 @@ import {
     AlertTriangle,
     ShieldAlert,
     RotateCcw,
-    ArrowRight
+    ArrowRight,
+    CheckCircle
 } from 'lucide-react'
 import api from '../services/api'
 
@@ -21,12 +23,31 @@ interface AnalysisData {
     counterargument?: any
 }
 
+interface PreScrapedData {
+    source_type: string
+    url: string
+    title: string
+    content: string
+    metadata: Record<string, any>
+}
+
 const ArgumentAnalysis = () => {
-    const [url, setUrl] = useState('')
+    const location = useLocation()
+    const preScrapedData = (location.state as { preScrapedData?: PreScrapedData })?.preScrapedData
+
+    const [url, setUrl] = useState(preScrapedData?.url || '')
     const [loading, setLoading] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [analysisData, setAnalysisData] = useState<AnalysisData>({})
     const [activeStep, setActiveStep] = useState(0)
+
+    // Auto-populate fetch data if pre-scraped content is available
+    useEffect(() => {
+        if (preScrapedData) {
+            setAnalysisData({ fetch: preScrapedData })
+            setActiveStep(1)
+        }
+    }, [])
 
     const steps = [
         { id: 'fetch', name: 'Source Extraction', icon: Search },
@@ -212,24 +233,37 @@ const ArgumentAnalysis = () => {
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">Argument Analysis</h1>
                 <p className="text-gray-500 mb-6">Analyze content for logical consistency, claims, and controversies using multi-agent orchestration.</p>
 
-                <div className="flex gap-4">
-                    <input
-                        type="text"
-                        className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="Enter YouTube or Web URL..."
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        disabled={loading !== null}
-                    />
-                    <button
-                        onClick={() => runStep('fetch')}
-                        disabled={!url || loading !== null}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                        {loading === 'fetch' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
-                        Start Analysis
-                    </button>
-                </div>
+                {preScrapedData ? (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 text-green-800">
+                            <CheckCircle className="h-5 w-5" />
+                            <span className="font-medium">Content pre-loaded from scraper</span>
+                        </div>
+                        <p className="mt-1 text-sm text-green-700">
+                            <span className="font-medium">{preScrapedData.title}</span> — {preScrapedData.url}
+                        </p>
+                        <p className="mt-2 text-xs text-green-600">Click "Run Step" on Summary to continue the analysis.</p>
+                    </div>
+                ) : (
+                    <div className="flex gap-4">
+                        <input
+                            type="text"
+                            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Enter YouTube or Web URL..."
+                            value={url}
+                            onChange={(e) => setUrl(e.target.value)}
+                            disabled={loading !== null}
+                        />
+                        <button
+                            onClick={() => runStep('fetch')}
+                            disabled={!url || loading !== null}
+                            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {loading === 'fetch' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
+                            Start Analysis
+                        </button>
+                    </div>
+                )}
                 {error && <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>}
             </div>
 

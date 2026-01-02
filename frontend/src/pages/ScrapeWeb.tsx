@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Globe, Loader2, CheckCircle, XCircle, Download } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Globe, Loader2, CheckCircle, XCircle, Download, ArrowRight } from 'lucide-react'
 import { api, ScrapeResponse } from '../services/api'
 
 interface TextElement {
@@ -13,6 +14,7 @@ interface TextElement {
 }
 
 const ScrapeWeb = () => {
+  const navigate = useNavigate()
   const [url, setUrl] = useState('')
   const [collection, setCollection] = useState('')
   const [loading, setLoading] = useState(false)
@@ -113,14 +115,31 @@ const ScrapeWeb = () => {
 
     const fullText = textElements.map(el => el.content).join('\n\n')
     const blob = new Blob([fullText], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
+    const downloadUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
+    a.href = downloadUrl
     a.download = `${scrapeResult.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    URL.revokeObjectURL(downloadUrl)
+  }
+
+  const handleAnalyzeContent = () => {
+    if (!scrapeResult?.success) return
+
+    const fullContent = textElements.map(el => el.content).join('\n\n')
+    navigate('/analysis', {
+      state: {
+        preScrapedData: {
+          source_type: 'webpage',
+          url: url.trim(),
+          title: scrapeResult.title,
+          content: fullContent,
+          metadata: {}
+        }
+      }
+    })
   }
 
   const selectedCount = textElements.filter(el => el.selected).length
@@ -212,13 +231,20 @@ const ScrapeWeb = () => {
                   Found {scrapeResult.text_elements.length} text elements
                   ({scrapeResult.total_text_length.toLocaleString()} characters total)
                 </p>
-                <div className="mt-2">
+                <div className="mt-2 flex gap-2">
                   <button
                     onClick={handleDownload}
                     className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Download as Plain Text
+                  </button>
+                  <button
+                    onClick={handleAnalyzeContent}
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Analyze Content
                   </button>
                 </div>
               </div>

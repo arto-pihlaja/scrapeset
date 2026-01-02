@@ -27,7 +27,6 @@ cd scrape
 
 2. Install dependencies:
 
-**Option A: Full installation (recommended)**
 ```bash
 # Create a virtual environment
 uv venv
@@ -37,16 +36,6 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 uv pip install -r requirements.txt
-```
-
-**Option B: If you encounter version conflicts**
-```bash
-uv pip install -r requirements-minimal.txt
-```
-
-**Option C: Core functionality only**
-```bash
-uv pip install -r requirements-core.txt
 ```
 
 3. Set up environment variables (optional):
@@ -422,23 +411,12 @@ uv run python -m pytest tests/ -v
 
 **Problem**: Dependency version conflicts during `pip install`
 
-**Solutions**:
-1. Use a fresh virtual environment with uv:
-   ```bash
-   uv venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   uv pip install -r requirements-minimal.txt
-   ```
-
-2. Update dependencies and try again:
-   ```bash
-   uv pip install -r requirements.txt
-   ```
-
-3. Install core dependencies only:
-   ```bash
-   uv pip install -r requirements-core.txt
-   ```
+**Solution**: Use a fresh virtual environment with uv:
+```bash
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt
+```
 
 ### Common Runtime Issues
 

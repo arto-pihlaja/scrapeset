@@ -1,5 +1,6 @@
 """YouTube metadata and transcript extraction tools, ported from argumentanalyzer."""
 
+import os
 import re
 import logging
 from typing import Any
