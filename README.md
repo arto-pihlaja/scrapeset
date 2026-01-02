@@ -9,6 +9,7 @@ A powerful command-line tool for scraping web content and querying it using Retr
 - **Vector Storage**: Automatic chunking and embedding storage using ChromaDB
 - **RAG-Powered Q&A**: Ask questions about scraped content with context-aware responses
 - **Conversation Memory**: Multi-turn conversations with context retention and history
+- **Full Text Preview**: Review concatenated plain text of all scraped content before indexing
 - **Multiple LLM Support**: Works with OpenAI, Anthropic, and OpenRouter APIs
 - **Web Interface**: Modern React-based web UI with real-time updates
 - **Rich CLI Interface**: Beautiful command-line interface with progress indicators
@@ -312,8 +313,6 @@ DEFAULT_MODEL=claude-3-sonnet-20240229
 
 ### Text Processing
 ```bash
-MIN_TEXT_LENGTH=300          # Minimum text length to consider
-MIN_WORD_COUNT=100           # Minimum word count to filter out navigation
 TEXT_PREVIEW_WORDS=50        # Words shown in preview
 CHUNK_SIZE=1000             # Text chunk size for embedding
 CHUNK_OVERLAP=200           # Overlap between chunks
@@ -330,13 +329,11 @@ EMBEDDING_MODEL=default              # Embedding model to use
 ```bash
 CONVERSATION_MEMORY_SIZE=5           # Number of exchange pairs to remember
 CONVERSATION_PERSISTENCE=false      # Auto-save conversations
-CONVERSATION_CONTEXT_RATIO=0.3      # Balance between RAG context and conversation history
 ```
 
 ### Scraping Settings
 ```bash
 REQUEST_TIMEOUT=30           # HTTP request timeout
-MAX_RETRIES=3               # Maximum retry attempts
 USER_AGENT=Mozilla/5.0...   # Custom user agent
 ```
 
