@@ -540,6 +540,51 @@ async def drop_collection(collection_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Analysis Models
+class AnalysisStepRequest(BaseModel):
+    step: str
+    url: Optional[str] = None
+    text: Optional[str] = None
+    previous_data: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/analysis/step")
+async def analysis_step(request: AnalysisStepRequest):
+    """Run a specific step of the analysis pipeline."""
+    try:
+        from src.analysis import AnalysisCrew
+        crew = AnalysisCrew()
+        
+        input_data = {}
+        if request.step == "fetch":
+            input_data["url"] = request.url
+        elif request.step == "summary":
+            input_data["content_data"] = request.previous_data
+        elif request.step == "claims":
+            input_data["summary_data"] = request.previous_data
+        elif request.step == "controversy":
+            input_data["summary_data"] = request.previous_data.get("summary")
+            input_data["claims_data"] = request.previous_data.get("claims")
+            input_data["full_text"] = request.previous_data.get("full_text", "")
+        elif request.step == "fallacies":
+            input_data["claims_data"] = request.previous_data.get("claims")
+            input_data["full_text"] = request.previous_data.get("full_text", "")
+        elif request.step == "counterargument":
+            input_data["claims_data"] = request.previous_data.get("claims")
+            input_data["summary_data"] = request.previous_data.get("summary")
+            
+        result = await asyncio.to_thread(crew.run_step, request.step, input_data)
+        
+        if "error" in result:
+            return {"success": False, "error": result["error"]}
+            
+        return {"success": True, "data": result}
+        
+    except Exception as e:
+        logger.error(f"Analysis step {request.step} failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

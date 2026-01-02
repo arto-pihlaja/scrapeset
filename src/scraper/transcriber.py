@@ -22,45 +22,27 @@ def get_youtube_id(url: str) -> Optional[str]:
         return parsed.path.lstrip("/")
     return None
 
-def fetch_youtube_transcript(video_id: str) -> Optional[str]:
-    """Attempts to fetch existing transcript from YouTube."""
+def fetch_youtube_transcript(video_id: str) -> Optional[dict]:
+    """Attempts to fetch existing transcript and metadata from YouTube."""
     try:
-        # Pass cookies if available
-        cookies_file = settings.youtube_cookies_path
+        from src.analysis.tools.youtube import YouTubeMetadataTool
+        tool = YouTubeMetadataTool()
+        # The tool expects a full URL, but we can reconstruct it or modify tool
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        result = tool._run(url)
         
-        # list_transcripts returns a TranscriptList object which is iterable
-        # Note: list_transcripts does accept cookies in newer versions, 
-        # but if not, we rely on the environment or netrc. 
-        # Actually youtube_transcript_api supports checking cookies.txt format?
-        # It supports `cookies` argument in `get_transcript` and `list_transcripts`.
-        kwargs = {}
-        if cookies_file and os.path.exists(cookies_file):
-             kwargs['cookies'] = cookies_file
-
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, **kwargs)
-        
-        # Try to find a transcript (manual or auto-generated)
-        # We prioritize english manual, then english auto, then whatever is available
-        transcript = None
-        
-        try:
-           transcript = transcript_list.find_manually_created_transcript(['en', 'en-US', 'en-GB'])
-        except NoTranscriptFound:
-            try:
-                transcript = transcript_list.find_generated_transcript(['en', 'en-US', 'en-GB'])
-            except NoTranscriptFound:
-                # Fallback to any available transcript
-                for t in transcript_list:
-                    transcript = t
-                    break
-                    
-        if not transcript:
-            return None
-            
-        fetched = transcript.fetch()
-        full_text = " ".join([item['text'] for item in fetched])
-        return full_text
-    except (TranscriptsDisabled, NoTranscriptFound, Exception) as e:
+        if result.get("transcript"):
+            return {
+                "text": result["transcript"],
+                "metadata": {
+                    "title": result.get("title"),
+                    "channel": result.get("channel"),
+                    "description": result.get("description"),
+                    "duration": result.get("duration")
+                }
+            }
+        return None
+    except Exception as e:
         logger.warning(f"YouTube transcript failed: {e}")
         return None
 
@@ -122,20 +104,119 @@ def extract_metadata_and_subs(url: str) -> Tuple[Dict[str, Any], Optional[str]]:
             # If extraction failed, we return empty info and None
             return {}, None
 
-# ... (download_audio, split_audio, transcribe_audio_file omitted - kept as is) ...
+def download_audio(url: str) -> str:
+    """Downloads audio from a URL using yt-dlp."""
+    download_folder = settings.download_folder
+    os.makedirs(download_folder, exist_ok=True)
+
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+        'outtmpl': os.path.join(download_folder, '%(id)s.%(ext)s'),
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    if settings.youtube_cookies_path:
+        ydl_opts['cookiefile'] = settings.youtube_cookies_path
+
+    if settings.ffmpeg_location and settings.ffmpeg_location != "ffmpeg":
+         ydl_opts['ffmpeg_location'] = settings.ffmpeg_location
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        audio_path = os.path.join(download_folder, f"{info['id']}.mp3")
+        return audio_path
+
+def split_audio(audio_path: str, max_size_mb: int = 25) -> List[str]:
+    """Splits an audio file into chunks using ffmpeg if it exceeds max_size_mb."""
+    file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+    if file_size_mb <= max_size_mb:
+        return [audio_path]
+
+    logger.info(f"Audio file size ({file_size_mb:.2f}MB) exceeds limit. Splitting...")
+    
+    chunks_folder = settings.audio_chunks_folder
+    os.makedirs(chunks_folder, exist_ok=True)
+    
+    # Get duration
+    ffprobe_cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", audio_path
+    ]
+    duration = float(subprocess.check_output(ffprobe_cmd).strip())
+    
+    # Calculate number of chunks
+    num_chunks = math.ceil(file_size_mb / (max_size_mb * 0.9)) # 10% safety margin
+    chunk_duration = duration / num_chunks
+    
+    chunks = []
+    base_name = os.path.splitext(os.path.basename(audio_path))[0]
+    
+    for i in range(num_chunks):
+        start_time = i * chunk_duration
+        output_path = os.path.join(chunks_folder, f"{base_name}_chunk_{i}.mp3")
+        
+        ffmpeg_cmd = [
+            settings.ffmpeg_location, "-y", "-ss", str(start_time),
+            "-t", str(chunk_duration), "-i", audio_path,
+            "-acodec", "copy", output_path
+        ]
+        
+        subprocess.run(ffmpeg_cmd, check=True, capture_output=True)
+        chunks.append(output_path)
+    
+    return chunks
+
+def transcribe_audio_file(audio_path: str, api_key: str) -> str:
+    """Transcribes an audio file using OpenAI Whisper API."""
+    client = OpenAI(api_key=api_key)
+    
+    chunks = split_audio(audio_path)
+    full_transcript = []
+    
+    try:
+        for chunk_path in chunks:
+            with open(chunk_path, "rb") as audio_file:
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
+                full_transcript.append(transcript.text)
+            
+            # Cleanup chunk if it's not the original file
+            if chunk_path != audio_path and os.path.exists(chunk_path):
+                os.remove(chunk_path)
+                
+        return " ".join(full_transcript)
+    except Exception as e:
+        logger.error(f"Whisper transcription failed: {e}")
+        # Cleanup chunks on failure
+        for chunk_path in chunks:
+            if chunk_path != audio_path and os.path.exists(chunk_path):
+                os.remove(chunk_path)
+        raise e
 
 def process_video(url: str, api_key: Optional[str] = None) -> str:
     """Main orchestrator function for video transcription."""
     
-    # 1. Check YouTube Transcript API (Fastest, no auth usually needed for public)
+    # 1. Check YouTube Transcript & Metadata (Improved version)
     yt_id = get_youtube_id(url)
     if yt_id:
-        logger.info(f"Detected YouTube ID: {yt_id}. Checking for existing transcripts via API...")
-        text = fetch_youtube_transcript(yt_id)
-        if text:
-            return f"[Source: YouTube Transcript]\n\n{text}"
+        logger.info(f"Detected YouTube ID: {yt_id}. Checking for existing transcripts and metadata...")
+        result = fetch_youtube_transcript(yt_id)
+        if result and result.get("text"):
+            metadata_str = ""
+            meta = result.get("metadata", {})
+            if meta.get("title"):
+                metadata_str = f"Title: {meta['title']}\nChannel: {meta.get('channel', 'Unknown')}\n\n"
+            return f"[Source: YouTube Transcript]\n\n{metadata_str}{result['text']}"
             
-     # 2. Check YouTube Subtitles via yt-dlp (Robust, handles cookies well)
+     # 2. Check YouTube Subtitles via yt-dlp (Robust fallback for subs)
     # This works without ffmpeg if we just want VTT subs
     if yt_id:
          logger.info("Checking for subtitles via yt-dlp...")

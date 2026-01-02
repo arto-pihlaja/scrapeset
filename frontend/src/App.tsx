@@ -6,6 +6,7 @@ import Collections from './pages/Collections'
 import Chat from './pages/Chat'
 import Conversations from './pages/Conversations'
 import Settings from './pages/Settings'
+import ArgumentAnalysis from './pages/ArgumentAnalysis'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/scrape" element={<ScrapeWeb />} />
+        <Route path="/analysis" element={<ArgumentAnalysis />} />
         <Route path="/collections" element={<Collections />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/conversations" element={<Conversations />} />

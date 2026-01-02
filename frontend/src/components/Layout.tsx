@@ -8,7 +8,8 @@ import {
   History,
   Settings,
   Menu,
-  X
+  X,
+  ShieldAlert
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -23,6 +24,7 @@ const Layout = ({ children }: LayoutProps) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Scrape Web', href: '/scrape', icon: Globe },
+    { name: 'Argument Analysis', href: '/analysis', icon: ShieldAlert },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
     { name: 'Collections', href: '/collections', icon: Database },
     { name: 'Conversations', href: '/conversations', icon: History },

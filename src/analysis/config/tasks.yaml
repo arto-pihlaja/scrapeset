@@ -1,0 +1,95 @@
+fetch_content:
+  description: >
+    Extract content from the provided URL: {url}
+
+    If it's a regular webpage:
+    - Extract the main text content
+    - Get the page title and any author/date information
+
+    If it's a YouTube video:
+    - Extract the full transcript with timestamps
+    - Get video metadata: title, channel name, description, duration
+
+    Return the content in a structured format.
+  expected_output: >
+    A JSON object with:
+    - source_type: "webpage" or "youtube"
+    - url: the original URL
+    - title: page/video title
+    - content: full text content or transcript
+    - metadata: object with author, publish_date, channel, duration, description as applicable
+  agent: fetcher
+
+analyze_content:
+  description: >
+    Analyze the following content and extract structured information:
+
+    {content}
+
+    Identify:
+    1. All significant claims made (factual, opinion, or prediction)
+    2. Key entities mentioned (people, organizations, concepts)
+    3. The main topic and central argument
+    4. Source credibility assessment with reasoning
+    5. Potential biases in the content
+
+    For each claim, note its location (paragraph number or timestamp).
+  expected_output: >
+    A JSON object with:
+    - claims: array of {id, text, location, type}
+    - key_entities: array of strings
+    - main_topic: string
+    - source_assessment: {credibility: high/medium/low/unknown, reasoning: string, potential_biases: array}
+  agent: analyzer
+
+detect_fallacies:
+  description: >
+    Review the following claims and content for logical fallacies:
+
+    Claims:
+    {claims}
+
+    Original content:
+    {content}
+
+    For each fallacy found:
+    1. Identify the fallacy type
+    2. Quote the exact text containing the fallacy
+    3. Note the location (paragraph/timestamp)
+    4. Explain why it's a fallacy
+    5. Suggest a search query to find counterarguments
+
+    Also provide suggested searches for finding opposing viewpoints on the main contested claims.
+
+    If no fallacies are found, return an empty fallacies array.
+  expected_output: >
+    A JSON object with:
+    - fallacies: array of {type, claim_id, quote, location, explanation, counterargument_search}
+    - overall_reasoning_quality: "strong", "moderate", or "weak"
+    - counterargument_sources: array of {topic, suggested_search}
+  agent: fallacy_detector
+
+summarize_content:
+  description: >
+    Create a summary of the analyzed content:
+
+    Original content:
+    {content}
+
+    Analysis results:
+    {analysis}
+
+    Create:
+    1. A 2-3 paragraph summary capturing the essence
+    2. A list of key points with their locations (paragraph numbers or timestamps)
+    3. The main argument or thesis
+    4. Key conclusions
+
+    For video content, include timestamps for easy reference.
+  expected_output: >
+    A JSON object with:
+    - summary: string (2-3 paragraphs)
+    - key_points: array of {point, location}
+    - main_argument: string
+    - conclusions: array of strings
+  agent: summarizer

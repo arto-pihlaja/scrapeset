@@ -216,6 +216,17 @@ export const api = {
   async deleteChatSession(sessionId: string): Promise<{ success: boolean; message: string }> {
     const response = await axiosInstance.delete(`/chat/sessions/${sessionId}`)
     return response.data
+  },
+
+  // Analysis
+  async runAnalysisStep(data: {
+    step: string
+    url?: string
+    text?: string
+    previous_data?: any
+  }): Promise<{ success: boolean; data?: any; error?: string }> {
+    const response = await axiosInstance.post('/analysis/step', data)
+    return response.data
   }
 }
 
