@@ -1,0 +1,2 @@
+/usr/lib/python3.10/runpy.py:126: RuntimeWarning: 'src.cli.app' found in sys.modules after import of package 'src.cli', but prior to execution of 'src.cli.app'; this may result in unpredictable behaviour
+  warn(RuntimeWarning(msg))

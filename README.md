@@ -505,9 +505,7 @@ rm -rf ./data/chroma_db
 - ✅ Conversation persistence and management
 
 ### Future Enhancements
-- **Enhanced Scraping**: JavaScript rendering, PDF support, bulk processing
 - **Advanced RAG**: Multiple embedding models, re-ranking, optimization
-- **Better UX**: Web interface, configuration profiles, export/import
 - **Performance**: Async processing, caching, batch operations
 
 ## 🤝 Contributing

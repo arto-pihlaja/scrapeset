@@ -172,6 +172,24 @@ async def get_collection_stats(collection_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/collections/{collection_name}/content")
+async def get_collection_content(
+    collection_name: str,
+    limit: Optional[int] = 100,
+    offset: Optional[int] = 0,
+    url: Optional[str] = None
+):
+    """Get content for a specific collection."""
+    try:
+        store = VectorStore(collection_name=collection_name)
+        where = {"source_url": url} if url else None
+        content = store.get_content(limit=limit, offset=offset, where=where)
+        return {"success": True, "content": content}
+    except Exception as e:
+        logger.error(f"Failed to get collection content: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/scrape", response_model=ScrapeResponse)
 def scrape_url(request: ScrapeRequest):
     """Scrape a URL and return text elements."""

@@ -13,6 +13,12 @@ const Collections = () => {
   const [loading, setLoading] = useState(true)
   const [loadingStats, setLoadingStats] = useState(false)
 
+  // Content view state
+  const [showContentModal, setShowContentModal] = useState(false)
+  const [collectionContent, setCollectionContent] = useState<any[]>([])
+  const [loadingContent, setLoadingContent] = useState(false)
+  const [viewingCollectionName, setViewingCollectionName] = useState('')
+
   useEffect(() => {
     fetchCollections()
   }, [])
@@ -46,6 +52,22 @@ const Collections = () => {
       console.error('Failed to fetch collection details:', error)
     } finally {
       setLoadingStats(false)
+    }
+  }
+
+  const fetchCollectionContent = async (collectionName: string) => {
+    setLoadingContent(true)
+    setViewingCollectionName(collectionName)
+    setShowContentModal(true)
+    try {
+      const response = await api.getCollectionContent(collectionName)
+      if (response.success) {
+        setCollectionContent(response.content)
+      }
+    } catch (error) {
+      console.error('Failed to fetch collection content:', error)
+    } finally {
+      setLoadingContent(false)
     }
   }
 
@@ -93,8 +115,6 @@ const Collections = () => {
     }
   }
 
-  // Backward compatibility
-  const handleDeleteCollection = handleClearCollection
 
   if (loading) {
     return (
@@ -137,9 +157,8 @@ const Collections = () => {
                 {collections.map((collection) => (
                   <div
                     key={collection.id}
-                    className={`p-6 hover:bg-gray-50 cursor-pointer transition-colors ${
-                      selectedCollection?.id === collection.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                    }`}
+                    className={`p-6 hover:bg-gray-50 cursor-pointer transition-colors ${selectedCollection?.id === collection.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                      }`}
                     onClick={() => fetchCollectionDetails(collection)}
                   >
                     <div className="flex items-center justify-between">
@@ -166,12 +185,13 @@ const Collections = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            fetchCollectionDetails(collection)
+                            fetchCollectionContent(collection.name)
                           }}
-                          className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
-                          title="View details"
+                          className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 flex items-center"
+                          title="View collection content"
                         >
-                          <Eye className="h-5 w-5" />
+                          <Eye className="h-5 w-5 mr-1" />
+                          <span className="text-sm font-medium">View Content</span>
                         </button>
 
                         {/* Dropdown menu for actions */}
@@ -179,6 +199,7 @@ const Collections = () => {
                           <button
                             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50"
                             title="Collection actions"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-5 w-5" />
                           </button>
@@ -271,15 +292,29 @@ const Collections = () => {
                                 </p>
                               </div>
                               {source.url && source.url !== 'Unknown' && (
-                                <a
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="ml-2 text-gray-400 hover:text-blue-600"
-                                  title="Open source URL"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      // Optional: Filter content by this URL
+                                      // For now just fetch all
+                                      fetchCollectionContent(selectedCollection.name)
+                                    }}
+                                    className="text-gray-400 hover:text-blue-600"
+                                    title="View chunks from this source"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                  <a
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-gray-400 hover:text-blue-600"
+                                    title="Open source URL"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </div>
                               )}
                             </div>
                             {source.url && source.url !== 'Unknown' && (
@@ -295,6 +330,13 @@ const Collections = () => {
 
                   {/* Actions */}
                   <div className="space-y-2">
+                    <button
+                      onClick={() => fetchCollectionContent(selectedCollection.name)}
+                      className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-sm font-medium rounded-md text-white hover:bg-blue-700 transition-colors"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Collection Content
+                    </button>
                     <button
                       onClick={() => handleClearCollection(selectedCollection.name)}
                       className="w-full flex items-center justify-center px-4 py-2 border border-orange-300 text-sm font-medium rounded-md text-orange-700 bg-white hover:bg-orange-50"
@@ -324,6 +366,86 @@ const Collections = () => {
           )}
         </div>
       </div>
+
+      {/* Content View Modal */}
+      {showContentModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75" onClick={() => setShowContentModal(false)}></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4 border-b pb-3">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Content: {viewingCollectionName}
+                  </h3>
+                  <button
+                    onClick={() => setShowContentModal(false)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+
+                {loadingContent ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                  </div>
+                ) : collectionContent.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">No documents found in this collection.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[60vh] overflow-y-auto p-2">
+                    {collectionContent.map((item, index) => (
+                      <div key={item.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-xs font-mono text-gray-500">#{index + 1} | ID: {item.id.substring(0, 8)}...</span>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium uppercase">
+                            {item.metadata.tag || 'text'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                          {item.document}
+                        </p>
+                        <div className="mt-3 pt-2 border-t border-gray-100 flex flex-wrap gap-2">
+                          <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
+                            Source: {item.metadata.source_title || 'Unknown'}
+                          </span>
+                          {item.metadata.source_url && (
+                            <span className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded truncate max-w-xs">
+                              URL: {item.metadata.source_url}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowContentModal(false)}
+                >
+                  Close
+                </button>
+                <div className="mt-3 sm:mt-0 sm:mr-auto">
+                  <p className="text-xs text-gray-500 py-2">
+                    Showing {collectionContent.length} chunks from collection
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

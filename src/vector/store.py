@@ -331,6 +331,48 @@ class VectorStore:
             logger.error(f"Failed to get sources: {e}")
             return []
 
+    def get_content(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        where: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve documents and metadata from the collection.
+
+        Args:
+            limit: Maximum number of documents to return
+            offset: Number of documents to skip
+            where: Metadata filters
+
+        Returns:
+            List of dictionaries containing document content and metadata
+        """
+        try:
+            if not self.collection:
+                return []
+
+            results = self.collection.get(
+                limit=limit,
+                offset=offset,
+                where=where,
+                include=["documents", "metadatas"]
+            )
+
+            formatted_results = []
+            if results['ids']:
+                for i in range(len(results['ids'])):
+                    formatted_results.append({
+                        'id': results['ids'][i],
+                        'document': results['documents'][i] if results['documents'] else "",
+                        'metadata': results['metadatas'][i] if results['metadatas'] else {}
+                    })
+
+            return formatted_results
+
+        except Exception as e:
+            logger.error(f"Failed to get collection content: {e}")
+            return []
+
     def list_collections(self) -> List[Dict[str, Any]]:
         """Get a list of all collections in the database.
 

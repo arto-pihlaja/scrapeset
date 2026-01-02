@@ -602,6 +602,49 @@ def create_app() -> typer.Typer:
             console.print("[yellow]Use --list to see saved conversations, --load <id> to view, or --delete <id> to remove.[/yellow]")
 
     @app.command()
+    def view(
+        collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
+        url: Optional[str] = typer.Option(None, "--url", help="Filter content by source URL"),
+        limit: int = typer.Option(10, "--limit", help="Number of documents to display"),
+        offset: int = typer.Option(0, "--offset", help="Number of documents to skip")
+    ):
+        """View text content in a collection."""
+
+        vector_store = VectorStore(collection_name=collection)
+        
+        where = {"source_url": url} if url else None
+        content = vector_store.get_content(limit=limit, offset=offset, where=where)
+        
+        console.print(f"\n[bold green]Collection Content: {vector_store.collection_name}[/bold green]")
+        if url:
+            console.print(f"[dim]Filtering by URL: {url}[/dim]")
+        
+        if not content:
+            console.print("[yellow]No documents found.[/yellow]")
+            return
+
+        for i, item in enumerate(content, 1):
+            metadata = item.get('metadata', {})
+            source = metadata.get('source_title', 'Unknown Source')
+            tag = metadata.get('tag', 'text')
+            
+            title = f"Document {offset + i} | Source: {source} | Tag: {tag}"
+            console.print(Panel(
+                item['document'],
+                title=title,
+                title_align="left",
+                border_style="blue",
+                padding=(1, 2)
+            ))
+            
+            if i < len(content):
+                console.print("") # Spacer
+
+        # Show summary
+        total_count = vector_store.get_collection_stats()['document_count']
+        console.print(f"\n[dim]Showing {len(content)} of {total_count} documents.[/dim]")
+
+    @app.command()
     def clear(
         collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
         url: Optional[str] = typer.Option(None, "--url", help="Clear only documents from specific URL"),

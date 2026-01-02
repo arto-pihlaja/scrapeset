@@ -135,6 +135,25 @@ export const api = {
     return response.data
   },
 
+  async getCollectionContent(
+    collectionName: string,
+    limit: number = 100,
+    offset: number = 0,
+    url?: string
+  ): Promise<{
+    success: boolean
+    content: Array<{
+      id: string
+      document: string
+      metadata: any
+    }>
+  }> {
+    const params: any = { limit, offset }
+    if (url) params.url = url
+    const response = await axiosInstance.get(`/collections/${collectionName}/content`, { params })
+    return response.data
+  },
+
   // Backward compatibility
   async deleteCollection(collectionName: string): Promise<{ success: boolean }> {
     const response = await axiosInstance.delete(`/collections/${collectionName}`)
