@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Globe, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { Globe, Loader2, CheckCircle, XCircle, Download } from 'lucide-react'
 import { api, ScrapeResponse } from '../services/api'
 
 interface TextElement {
@@ -108,6 +108,21 @@ const ScrapeWeb = () => {
     }
   }
 
+  const handleDownload = () => {
+    if (!scrapeResult?.success) return
+
+    const fullText = textElements.map(el => el.content).join('\n\n')
+    const blob = new Blob([fullText], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${scrapeResult.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const selectedCount = textElements.filter(el => el.selected).length
 
   return (
@@ -197,6 +212,15 @@ const ScrapeWeb = () => {
                   Found {scrapeResult.text_elements.length} text elements
                   ({scrapeResult.total_text_length.toLocaleString()} characters total)
                 </p>
+                <div className="mt-2">
+                  <button
+                    onClick={handleDownload}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download as Plain Text
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4">
