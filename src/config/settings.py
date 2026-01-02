@@ -12,6 +12,14 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = config("OPENAI_API_KEY", default=None)
     anthropic_api_key: Optional[str] = config("ANTHROPIC_API_KEY", default=None)
     openrouter_api_key: Optional[str] = config("OPENROUTER_API_KEY", default=None)
+    deepseek_api_key: Optional[str] = config("DEEPSEEK_API_KEY", default=None)
+    
+    # Generic LLM support (e.g. DeepSeek, LocalAI)
+    llm_api_base: Optional[str] = config("LLM_API_BASE", default=None)
+    llm_api_key: Optional[str] = config("LLM_API_KEY", default=None)
+
+    # Specific key for Whisper if different from OpenAI key
+    whisper_api_key: Optional[str] = config("WHISPER_API_KEY", default=None)
 
     default_llm_provider: str = config("DEFAULT_LLM_PROVIDER", default="openai")
     default_model: str = config("DEFAULT_MODEL", default="gpt-3.5-turbo")
@@ -41,6 +49,19 @@ class Settings(BaseSettings):
         default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     )
 
+    # Advanced Scraping Options
+    use_dynamic_scraping: bool = config("USE_DYNAMIC_SCRAPING", default=False, cast=bool)
+    favor_recall: bool = config("FAVOR_RECALL", default=True, cast=bool)
+    include_tables: bool = config("INCLUDE_TABLES", default=True, cast=bool)
+    playwright_timeout: int = config("PLAYWRIGHT_TIMEOUT", default=10000, cast=int)
+    playwright_headless: bool = config("PLAYWRIGHT_HEADLESS", default=True, cast=bool)
+
+    # Video Transcription
+    ffmpeg_location: str = config("FFMPEG_LOCATION", default="ffmpeg")
+    download_folder: str = config("DOWNLOAD_FOLDER", default="./downloads")
+    audio_chunks_folder: str = config("AUDIO_CHUNKS_FOLDER", default="./downloads/chunks")
+    youtube_cookies_path: Optional[str] = config("YOUTUBE_COOKIES_PATH", default=None)
+
     # Conversation Memory
     conversation_memory_size: int = config("CONVERSATION_MEMORY_SIZE", default=5, cast=int)
     conversation_persistence: bool = config("CONVERSATION_PERSISTENCE", default=False, cast=bool)
@@ -69,3 +90,5 @@ def ensure_directories():
     """Ensure required directories exist."""
     Path(settings.chroma_persist_directory).parent.mkdir(parents=True, exist_ok=True)
     Path(settings.log_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.download_folder).mkdir(parents=True, exist_ok=True)
+    Path(settings.audio_chunks_folder).mkdir(parents=True, exist_ok=True)

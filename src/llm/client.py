@@ -28,6 +28,24 @@ class LLMClient:
         if settings.openrouter_api_key:
             litellm.openrouter_key = settings.openrouter_api_key
 
+        if settings.deepseek_api_key:
+            litellm.deepseek_key = settings.deepseek_api_key
+            
+        # Enable dropping unsupported params (e.g. temperature for o1 models)
+        litellm.drop_params = True
+            
+        # Generic LLM support
+        if settings.llm_api_base:
+            litellm.api_base = settings.llm_api_base
+        
+        if settings.llm_api_key:
+            # If using generic key, we might need to set it for specific providers or letting litellm handle it
+            # Typically for OpenAI-compatible, we can set openai_key to this if not already set,
+            # or rely on litellm's discovery. For safety, let's set openai_key if it's "openai/" provider usage.
+            # But safer:
+            if not litellm.openai_key:
+                litellm.openai_key = settings.llm_api_key
+
         # Set default model with proper provider prefix
         self.model = self._format_model_name(settings.default_model)
         logger.info(f"LLM client initialized with model: {self.model}")
@@ -35,22 +53,40 @@ class LLMClient:
     def _format_model_name(self, model: str) -> str:
         """Format model name with proper provider prefix for LiteLLM."""
         # If model already has a provider prefix, return as-is
-        if "/" in model and any(provider in model for provider in ["openai/", "anthropic/", "openrouter/", "huggingface/"]):
+        if "/" in model:
             return model
 
-        # Auto-detect provider and add prefix based on available API keys and model patterns
-        if settings.openrouter_api_key and any(provider in model for provider in ["mistralai/", "meta-llama/", "google/", "anthropic/claude"]):
+        # 1. Check explicit provider setting (except default openai)
+        provider = settings.default_llm_provider.lower()
+        if provider and provider != "openai":
+            # Map common provider names to LiteLLM prefixes if necessary
+            mapping = {
+                "deepseek": "deepseek",
+                "openrouter": "openrouter",
+                "anthropic": "anthropic",
+            }
+            prefix = mapping.get(provider, provider)
+            return f"{prefix}/{model}"
+
+        # 2. Auto-detect provider based on available API keys and model patterns
+        if settings.openai_api_key and (model.startswith("gpt-") or model.startswith("text-")):
+            return f"openai/{model}"
+        
+        if settings.deepseek_api_key and (model.startswith("deepseek-")):
+            return f"deepseek/{model}"
+
+        if settings.anthropic_api_key and "claude" in model:
+            return f"anthropic/{model}"
+            
+        if settings.openrouter_api_key:
+            # Fallback for OpenRouter if we have the key but no clear pattern
             return f"openrouter/{model}"
-        elif settings.openai_api_key and (model.startswith("gpt-") or model.startswith("text-") or model == "gpt-3.5-turbo" or model == "gpt-4"):
-            return f"openai/{model}" if not model.startswith("openai/") else model
-        elif settings.anthropic_api_key and "claude" in model:
-            return f"anthropic/{model}" if not model.startswith("anthropic/") else model
-        else:
-            # For OpenRouter models, default to openrouter prefix if we have the key
-            if settings.openrouter_api_key:
-                return f"openrouter/{model}"
-            else:
-                return model
+
+        # 3. Fallback to generic OpenAI if API base is set
+        if settings.llm_api_base:
+            return f"openai/{model}"
+
+        return model
 
     def _build_rag_prompt(
         self,

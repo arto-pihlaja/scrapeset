@@ -63,7 +63,7 @@ class VectorStore:
             return embedding_functions.DefaultEmbeddingFunction()
 
     def _setup_client(self):
-        """Setup ChromaDB client and collection."""
+        """Setup ChromaDB client and connect to collection if it exists."""
         try:
             # Ensure the persist directory exists
             persist_dir = Path(settings.chroma_persist_directory)
@@ -78,26 +78,38 @@ class VectorStore:
                 )
             )
 
-            # Setup embedding function based on configuration
-            embedding_function = self._get_embedding_function()
-
-            # Get or create collection
-            try:
-                self.collection = self.client.get_collection(
-                    name=self.collection_name,
-                    embedding_function=embedding_function
-                )
-                logger.info(f"Connected to existing collection: {self.collection_name}")
-            except Exception:  # Catch any exception when collection doesn't exist
-                self.collection = self.client.create_collection(
-                    name=self.collection_name,
-                    embedding_function=embedding_function,
-                    metadata={"description": "Scraped text content for RAG"}
-                )
-                logger.info(f"Created new collection: {self.collection_name}")
+            # Try to connect to the collection if we have a name
+            if self.collection_name:
+                try:
+                    self.collection = self.client.get_collection(
+                        name=self.collection_name,
+                        embedding_function=self._get_embedding_function()
+                    )
+                    logger.info(f"Connected to existing collection: {self.collection_name}")
+                except Exception:
+                    # Collection doesn't exist yet, that's fine for now
+                    self.collection = None
+                    logger.debug(f"Collection {self.collection_name} does not exist yet")
 
         except Exception as e:
             logger.error(f"Failed to setup ChromaDB client: {e}")
+            raise
+
+    def _ensure_collection(self):
+        """Ensure the collection exists, creating it if necessary."""
+        if self.collection:
+            return
+
+        try:
+            embedding_function = self._get_embedding_function()
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                embedding_function=embedding_function,
+                metadata={"description": "Scraped text content for RAG"}
+            )
+            logger.info(f"Ensured collection exists: {self.collection_name}")
+        except Exception as e:
+            logger.error(f"Failed to ensure collection: {e}")
             raise
 
     def add_chunks(self, chunks: List[TextChunk]) -> bool:
@@ -113,6 +125,9 @@ class VectorStore:
             if not chunks:
                 logger.warning("No chunks provided to add")
                 return True
+
+            # Ensure collection exists before adding
+            self._ensure_collection()
 
             # Prepare data for ChromaDB
             ids = [chunk.id for chunk in chunks]
@@ -150,6 +165,10 @@ class VectorStore:
             List of search results with documents, metadata, and distances
         """
         try:
+            if not self.collection:
+                logger.warning(f"No collection {self.collection_name} to search")
+                return []
+
             results = self.collection.query(
                 query_texts=[query],
                 n_results=n_results,
@@ -182,6 +201,13 @@ class VectorStore:
             Dictionary with collection statistics
         """
         try:
+            if not self.collection:
+                return {
+                    "collection_name": self.collection_name,
+                    "document_count": 0,
+                    "exists": False
+                }
+
             count = self.collection.count()
             return {
                 "collection_name": self.collection_name,
@@ -203,6 +229,10 @@ class VectorStore:
             True if successful, False otherwise
         """
         try:
+            if not self.collection:
+                logger.info(f"Collection {self.collection_name} does not exist, nothing to clear")
+                return True
+
             # Get all document IDs
             results = self.collection.get()
             if results['ids']:
@@ -224,6 +254,7 @@ class VectorStore:
         """
         try:
             self.client.delete_collection(self.collection_name)
+            self.collection = None
             logger.info(f"Dropped collection: {self.collection_name}")
             return True
 
@@ -247,6 +278,9 @@ class VectorStore:
             True if successful, False otherwise
         """
         try:
+            if not self.collection:
+                return True
+
             # Query for documents with the specific URL
             results = self.collection.get(
                 where={"source_url": source_url},
@@ -272,6 +306,9 @@ class VectorStore:
             List of dictionaries with source information
         """
         try:
+            if not self.collection:
+                return []
+
             results = self.collection.get(include=["metadatas"])
 
             # Extract unique sources
@@ -305,13 +342,18 @@ class VectorStore:
 
             collection_info = []
             for collection in collections:
-                # Get collection stats
-                temp_collection = self.client.get_collection(collection.name)
+                # Get collection stats without side-effects
+                # Note: Newer Chroma versions might have count on the collection object returned by list_collections
+                # but to be safe we use get_collection
+                temp_collection = self.client.get_collection(
+                    name=collection.name,
+                    embedding_function=self._get_embedding_function()
+                )
                 doc_count = temp_collection.count()
 
                 collection_info.append({
                     'name': collection.name,
-                    'id': collection.id,
+                    'id': str(collection.id) if hasattr(collection, 'id') else "",
                     'document_count': doc_count,
                     'metadata': collection.metadata
                 })

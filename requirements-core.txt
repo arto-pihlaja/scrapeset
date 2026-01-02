@@ -1,33 +1,9 @@
-# Core dependencies for ScrapeSET
-# Use this file if you encounter version conflicts with requirements.txt
-
-# Web scraping
-requests
-beautifulsoup4
-urllib3
-
-# LLM and AI (unified interface)
-litellm
-openai
-
-# Vector database
-chromadb
-
-# Text processing
-tiktoken
-
-# Configuration and environment
-python-decouple
-pydantic
-pydantic-settings
-
-# Web framework
-fastapi
-uvicorn
-
-# CLI interface
-typer
-rich
-
-# Utilities
-loguru
+# Core dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+python-decouple>=3.8
+pydantic>=2.5.0
+chromadb>=0.4.0
+tiktoken>=0.5.0
+loguru>=0.7.0
+trafilatura>=2.0.0

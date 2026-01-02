@@ -75,12 +75,18 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Shared VectorStore instance for efficiency
+# This uses the default collection from settings
+# Individual endpoints can still specify a collection_name if needed
+vector_store = VectorStore()
+
 
 # Pydantic models for API
 class ScrapeRequest(BaseModel):
     url: str
     collection: Optional[str] = None
     interactive: bool = True
+    dynamic: bool = False
 
 
 class ScrapeResponse(BaseModel):
@@ -146,7 +152,6 @@ async def health_check():
 async def get_collections():
     """Get all collections."""
     try:
-        vector_store = VectorStore()
         collections = vector_store.list_collections()
         return {"success": True, "collections": collections}
     except Exception as e:
@@ -168,14 +173,14 @@ async def get_collection_stats(collection_name: str):
 
 
 @app.post("/api/scrape", response_model=ScrapeResponse)
-async def scrape_url(request: ScrapeRequest):
+def scrape_url(request: ScrapeRequest):
     """Scrape a URL and return text elements."""
     try:
         # Initialize scraper
         scraper = WebScraper()
 
         # Scrape the URL
-        scraped_content = scraper.scrape(request.url)
+        scraped_content = scraper.scrape(request.url, dynamic=request.dynamic)
 
         if not scraped_content.success:
             return ScrapeResponse(
@@ -285,10 +290,12 @@ async def query_collection(request: QueryRequest):
             )
 
         # Generate response using LLM
-        response = llm_client.generate_response(
+        generated_result = llm_client.generate_response(
             query=request.question,
             context_documents=search_results
         )
+        
+        response_text = generated_result["response"]
 
         # Format sources
         sources = []
@@ -300,7 +307,7 @@ async def query_collection(request: QueryRequest):
             })
 
         return QueryResponse(
-            answer=response,
+            answer=response_text,
             sources=sources,
             success=True
         )
@@ -399,16 +406,18 @@ async def chat_with_collection(request: ChatRequest):
         # Generate response with conversation context
         conversation_history = memory.get_conversation_context() if memory else None
 
-        response = llm_client.generate_response(
+        generated_result = llm_client.generate_response(
             query=request.message,
             context_documents=search_results,
             conversation_history=conversation_history
         )
+        
+        response_text = generated_result["response"]
 
         # Update conversation memory
         if memory:
             memory.add_user_message(request.message)
-            memory.add_assistant_message(response)
+            memory.add_assistant_message(response_text)
 
         # Format sources
         sources = []
@@ -420,7 +429,7 @@ async def chat_with_collection(request: ChatRequest):
             })
 
         return ChatResponse(
-            response=response,
+            response=response_text,
             sources=sources,
             session_id=session_id,
             success=True,
@@ -491,8 +500,9 @@ async def delete_chat_session(session_id: str):
 async def clear_collection(collection_name: str):
     """Clear all documents from a collection."""
     try:
-        vector_store = VectorStore(collection_name=collection_name)
-        success = vector_store.clear_collection()
+        # Use a temporary store for the specific collection
+        temp_store = VectorStore(collection_name=collection_name)
+        success = temp_store.clear_collection()
         return {"success": success, "operation": "clear"}
     except Exception as e:
         logger.error(f"Failed to clear collection: {e}")
@@ -503,8 +513,9 @@ async def clear_collection(collection_name: str):
 async def drop_collection(collection_name: str):
     """Completely remove a collection from ChromaDB."""
     try:
-        vector_store = VectorStore(collection_name=collection_name)
-        success = vector_store.drop_collection()
+        # Use a temporary store for the specific collection
+        temp_store = VectorStore(collection_name=collection_name)
+        success = temp_store.drop_collection()
         return {"success": success, "operation": "drop"}
     except Exception as e:
         logger.error(f"Failed to drop collection: {e}")

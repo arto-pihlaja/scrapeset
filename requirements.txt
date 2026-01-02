@@ -2,7 +2,11 @@
 requests>=2.31.0
 beautifulsoup4>=4.12.0
 requests-cache>=1.1.0
+beautifulsoup4>=4.12.0
+requests-cache>=1.1.0
 playwright>=1.40.0
+# beautifulsoup4 is being replaced but kept for potential legacy compatibility during migration
+
 
 # LLM and AI (unified interface)
 litellm>=1.50.0
@@ -37,4 +41,12 @@ ruff>=0.1.0
 pre-commit>=3.6.0
 
 # Utilities
+# Utilities
 loguru>=0.7.0
+
+# Dependencies from scraper repo
+trafilatura>=2.0.0
+yt-dlp>=2025.12.8
+youtube-transcript-api==0.6.3
+python-multipart>=0.0.20
+openai>=2.11.0

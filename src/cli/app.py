@@ -10,7 +10,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm, Prompt
 
 from src.config import settings, ensure_directories
-from src.scraper import WebScraper, ScrapedContent
+from src.config import settings, ensure_directories
+from src.scraper import WebScraper, ScrapedContent, process_video
 from src.text import TextProcessor
 from src.vector import VectorStore
 from src.llm import LLMClient
@@ -55,7 +56,8 @@ def create_app() -> typer.Typer:
     def scrape(
         url: str = typer.Argument(..., help="URL to scrape"),
         interactive: bool = typer.Option(True, "--interactive/--auto", help="Interactive text selection"),
-        collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store")
+        collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store"),
+        dynamic: bool = typer.Option(False, "--dynamic", help="Use Playwright for dynamic content (JS rendering)")
     ):
         """Scrape a website and optionally add content to vector store."""
 
@@ -73,7 +75,7 @@ def create_app() -> typer.Typer:
             console=console
         ) as progress:
             task = progress.add_task("Scraping website...", total=None)
-            scraped_content = scraper.scrape(url)
+            scraped_content = scraper.scrape(url, dynamic=dynamic)
 
         if not scraped_content.success:
             console.print(f"[bold red]Failed to scrape URL:[/bold red] {scraped_content.error_message}")
@@ -143,6 +145,91 @@ def create_app() -> typer.Typer:
             console.print(f"Collection now contains {stats['document_count']} documents")
         else:
             console.print(f"[bold red]✗ Failed to add content to vector store[/bold red]")
+
+    @app.command()
+    def transcribe(
+        url: str = typer.Argument(..., help="Video URL to transcribe"),
+        collection: Optional[str] = typer.Option(None, "--collection", help="Collection name for vector store")
+    ):
+        """Transcribe a video (YouTube or others) and add to vector store."""
+        
+        console.print(f"\n[bold blue]Processing Video URL:[/bold blue] {url}")
+        
+        vector_store = VectorStore(collection_name=collection)
+        text_processor = TextProcessor()
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Transcribing video...", total=None)
+            try:
+                # process_video returns a string (the transcript)
+                transcript = process_video(url)
+            except Exception as e:
+                progress.stop()
+                console.print(f"[bold red]Transcription failed:[/bold red] {str(e)}")
+                raise typer.Exit(1)
+        
+        if "Error:" in transcript and not "[Source:" in transcript:
+             console.print(f"[bold red]Transcription failed:[/bold red] {transcript}")
+             raise typer.Exit(1)
+        
+        console.print(f"\n[bold green]Successfully transcribed content.[/bold green]")
+        
+        # Create a "pseudo" ScrapedContent to reuse logic or just handle adding directly
+        # Since we just have text, we'll create chunks from it directly.
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Processing text into chunks...", total=None)
+            
+            # We treat the transcript as one big element or split it?
+            # TextProcessor usually takes TextElement.
+            # Let's check TextProcessor.create_chunks_from_elements
+            # Or we can create chunks manually using TextProcessor's splitter.
+            
+            # Let's create a TextElement for it
+            from src.scraper import TextElement
+            
+            # Simple word count approximation
+            word_count = len(transcript.split())
+            preview = transcript[:200] + "..." if len(transcript) > 200 else transcript
+            
+            element = TextElement(
+                content=transcript,
+                tag="transcript",
+                preview=preview,
+                word_count=word_count,
+                char_count=len(transcript)
+            )
+            
+            chunks = text_processor.create_chunks_from_elements(
+                [element],
+                url,
+                f"Transcript: {url}"
+            )
+            
+        console.print(f"Created {len(chunks)} text chunks")
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Adding to vector store...", total=None)
+            success = vector_store.add_chunks(chunks)
+
+        if success:
+            console.print(f"[bold green]✓ Successfully added transcript to vector store[/bold green]")
+            stats = vector_store.get_collection_stats()
+            console.print(f"Collection now contains {stats['document_count']} documents")
+        else:
+            console.print(f"[bold red]✗ Failed to add transcript to vector store[/bold red]")
 
     @app.command()
     def query(

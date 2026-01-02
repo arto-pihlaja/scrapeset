@@ -26,6 +26,7 @@ export interface ScrapeRequest {
   url: string
   collection?: string
   interactive?: boolean
+  dynamic?: boolean
 }
 
 export interface ScrapeResponse {

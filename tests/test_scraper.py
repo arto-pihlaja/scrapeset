@@ -33,32 +33,29 @@ class TestWebScraper:
         assert scraper.session is not None
         assert "User-Agent" in scraper.session.headers
 
-    def test_extract_clean_text(self):
-        """Test text extraction and cleaning."""
-        from bs4 import BeautifulSoup
-
+    def test_text_element_creation(self):
+        """Test text element creation from raw text."""
         scraper = WebScraper()
-
-        # Test basic text extraction
-        html = "<p>This is a test paragraph.</p>"
-        soup = BeautifulSoup(html, 'html.parser')
-        element = soup.find('p')
-        text = scraper._extract_clean_text(element)
-        assert text == "This is a test paragraph."
-
-        # Test script/style removal
-        html = """
-        <div>
-            <p>Good content</p>
-            <script>alert('bad')</script>
-            <style>body { color: red; }</style>
-            <p>More good content</p>
-        </div>
-        """
-        soup = BeautifulSoup(html, 'html.parser')
-        element = soup.find('div')
-        text = scraper._extract_clean_text(element)
-        assert "Good content" in text
-        assert "More good content" in text
-        assert "alert" not in text
-        assert "color: red" not in text
+        
+        # Test basic text split
+        raw_text = "Paragraph 1\n\nParagraph 2\n\nP3"
+        elements = scraper._create_text_elements_from_text(raw_text)
+        
+        # Note: P3 might be filtered out if it's too short, depending on settings.
+        # Assuming defaults: MIN_TEXT_LENGTH=300? No, let's check settings.
+        # Actually in _create_text_elements_from_text I added a hard check:
+        # if len(words) < 5: continue
+        
+        text_long = "This is a sentence with enough words to be kept I hope."
+        text_short = "Short."
+        
+        elements = scraper._create_text_elements_from_text(f"{text_long}\n\n{text_short}")
+        
+        # Should have 1 element (the long one)
+        assert len(elements) == 1
+        assert elements[0].content == text_long
+        
+        # Test preview generation
+        text_very_long = "word " * 100
+        elements = scraper._create_text_elements_from_text(text_very_long)
+        assert elements[0].preview.endswith("...")

@@ -19,6 +19,7 @@ const ScrapeWeb = () => {
   const [scrapeResult, setScrapeResult] = useState<ScrapeResponse | null>(null)
   const [textElements, setTextElements] = useState<TextElement[]>([])
   const [processing, setProcessing] = useState(false)
+  const [dynamic, setDynamic] = useState(false)
 
   const handleScrape = async () => {
     if (!url.trim()) return
@@ -28,7 +29,8 @@ const ScrapeWeb = () => {
       const result = await api.scrapeUrl({
         url: url.trim(),
         collection: collection.trim() || undefined,
-        interactive: true
+        interactive: true,
+        dynamic: dynamic
       })
 
       setScrapeResult(result)
@@ -151,6 +153,19 @@ const ScrapeWeb = () => {
             />
           </div>
 
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="dynamic"
+              checked={dynamic}
+              onChange={(e) => setDynamic(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="dynamic" className="text-sm font-medium text-gray-700">
+              Enable Dynamic Scraping (with Playwright)
+            </label>
+          </div>
+
           <button
             onClick={handleScrape}
             disabled={loading || !url.trim()}
@@ -184,6 +199,16 @@ const ScrapeWeb = () => {
                 </p>
               </div>
 
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Scraped Text Preview</h3>
+                <div
+                  className="bg-gray-50 p-4 rounded border border-gray-200 h-64 overflow-y-auto whitespace-pre-wrap font-mono text-sm text-gray-700"
+                  id="scraped-text-preview"
+                >
+                  {scrapeResult.text_elements.map(el => el.content).join('\n\n')}
+                </div>
+              </div>
+
               {textElements.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -210,11 +235,10 @@ const ScrapeWeb = () => {
                     {textElements.map((element) => (
                       <div
                         key={element.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                          element.selected
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
+                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${element.selected
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                          }`}
                         onClick={() => toggleElement(element.id)}
                       >
                         <div className="flex items-start space-x-3">
