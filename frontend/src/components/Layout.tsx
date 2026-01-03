@@ -45,7 +45,7 @@ const Layout = ({ children }: LayoutProps) => {
       <div className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:inset-0 transition-transform duration-200 ease-in-out
+        lg:translate-x-0 transition-transform duration-200 ease-in-out
       `}>
         <div className="flex items-center justify-between h-16 px-4 border-b">
           <h1 className="text-xl font-bold text-gray-900">ScrapeSET</h1>
@@ -92,30 +92,18 @@ const Layout = ({ children }: LayoutProps) => {
 
       {/* Main content */}
       <div className="lg:pl-64 flex flex-col flex-1">
-        {/* Top bar */}
-        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
+        {/* Top bar - mobile only */}
+        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow lg:hidden">
           <button
-            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:hidden"
+            className="px-4 border-r border-gray-200 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-6 w-6" />
           </button>
 
-          <div className="flex-1 px-4 flex justify-between">
-            <div className="flex-1 flex">
-              <div className="w-full flex md:ml-0">
-                <div className="relative w-full text-gray-400 focus-within:text-gray-600">
-                  <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
-                    {/* Search icon could go here */}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="ml-4 flex items-center md:ml-6">
-              <div className="text-sm text-gray-500">
-                Web Scraping & RAG Tool
-              </div>
+          <div className="flex-1 px-4 flex justify-end items-center">
+            <div className="text-sm text-gray-500">
+              Web Scraping & RAG Tool
             </div>
           </div>
         </div>
