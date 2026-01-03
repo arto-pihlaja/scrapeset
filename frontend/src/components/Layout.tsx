@@ -57,7 +57,7 @@ const Layout = ({ children }: LayoutProps) => {
           </button>
         </div>
 
-        <nav className="mt-8">
+        <nav>
           <div className="px-2 space-y-1">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href
