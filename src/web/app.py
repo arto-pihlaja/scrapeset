@@ -8,10 +8,11 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 import re
+import json
 
 from src.config import settings, ensure_directories
 from src.scraper import WebScraper, ScrapedContent
@@ -768,15 +769,100 @@ async def analysis_step(request: AnalysisStepRequest):
             input_data["summary_data"] = request.previous_data.get("summary")
             
         result = await asyncio.to_thread(crew.run_step, request.step, input_data)
-        
+
         if "error" in result:
             return {"success": False, "error": result["error"]}
-            
+
         return {"success": True, "data": result}
-        
+
     except Exception as e:
         logger.error(f"Analysis step {request.step} failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+@app.post("/api/analysis/step/stream")
+async def analysis_step_stream(request: AnalysisStepRequest):
+    """Run analysis step with SSE streaming for progress updates.
+
+    Returns Server-Sent Events with progress messages during execution,
+    followed by the final result.
+    """
+    from src.analysis import AnalysisCrew
+
+    async def event_generator():
+        queue: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+
+        def progress_callback(message: str, step: str, progress: int):
+            """Callback invoked by AnalysisCrew to report progress."""
+            asyncio.run_coroutine_threadsafe(
+                queue.put({"type": "progress", "message": message, "step": step, "progress": progress}),
+                loop
+            )
+
+        async def run_analysis():
+            """Run the analysis in a thread pool with progress callback."""
+            crew = AnalysisCrew()
+
+            input_data = {}
+            if request.step == "fetch":
+                input_data["url"] = request.url
+            elif request.step == "summary":
+                input_data["content_data"] = request.previous_data
+            elif request.step == "claims":
+                input_data["summary_data"] = request.previous_data
+            elif request.step == "controversy":
+                input_data["summary_data"] = request.previous_data.get("summary")
+                input_data["claims_data"] = request.previous_data.get("claims")
+                input_data["full_text"] = request.previous_data.get("full_text", "")
+            elif request.step == "fallacies":
+                input_data["claims_data"] = request.previous_data.get("claims")
+                input_data["full_text"] = request.previous_data.get("full_text", "")
+            elif request.step == "counterargument":
+                input_data["claims_data"] = request.previous_data.get("claims")
+                input_data["summary_data"] = request.previous_data.get("summary")
+
+            return await asyncio.to_thread(
+                crew.run_step, request.step, input_data, progress_callback
+            )
+
+        # Start the analysis task
+        task = asyncio.create_task(run_analysis())
+
+        # Stream progress events while task is running
+        while not task.done():
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=2.0)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+
+        # Drain any remaining progress messages
+        while not queue.empty():
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+
+        # Get the final result
+        try:
+            result = await task
+            if "error" in result:
+                yield f"data: {json.dumps({'type': 'error', 'error': result['error']})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'complete', 'success': True, 'data': result})}\n\n"
+        except Exception as e:
+            logger.error(f"Analysis step {request.step} failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 # WebSocket endpoint for real-time updates

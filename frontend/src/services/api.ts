@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 600000,  // 10 minutes for long-running operations
 })
 
 // Request interceptor
@@ -249,6 +249,64 @@ export const api = {
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     const response = await axiosInstance.post('/analysis/step', data)
     return response.data
+  },
+
+  // Analysis with SSE streaming for progress updates
+  async runAnalysisStepWithProgress(
+    data: {
+      step: string
+      url?: string
+      text?: string
+      previous_data?: any
+    },
+    onProgress: (message: string, progress: number) => void
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    const response = await fetch(`${API_BASE_URL}/analysis/step/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      return { success: false, error: `HTTP error: ${response.status}` }
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      return { success: false, error: 'No response body' }
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''  // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'progress') {
+              onProgress(event.message, event.progress)
+            } else if (event.type === 'complete') {
+              return { success: true, data: event.data }
+            } else if (event.type === 'error') {
+              return { success: false, error: event.error }
+            }
+            // Ignore heartbeat events
+          } catch (e) {
+            console.warn('Failed to parse SSE event:', line)
+          }
+        }
+      }
+    }
+
+    return { success: false, error: 'Stream ended unexpectedly' }
   },
 
   // Saved Results

@@ -84,11 +84,30 @@ class AnalysisCrew:
         result = crew.kickoff()
         return str(result)
 
-    def run_step(self, step_name: str, input_data: dict[str, Any]) -> dict[str, Any]:
-        """Run a specific step of the analysis pipeline."""
-        
+    def run_step(
+        self,
+        step_name: str,
+        input_data: dict[str, Any],
+        progress_callback: ProgressCallback | None = None
+    ) -> dict[str, Any]:
+        """Run a specific step of the analysis pipeline.
+
+        Args:
+            step_name: The analysis step to run
+            input_data: Input data for the step
+            progress_callback: Optional callback for progress updates (message, step, progress%)
+        """
+
+        def emit(message: str, progress: int):
+            """Emit progress update if callback is registered."""
+            if progress_callback:
+                progress_callback(message, step_name, progress)
+
         if step_name == "fetch":
-            return fetch_content(input_data["url"])
+            emit("Fetching content from URL...", 10)
+            result = fetch_content(input_data["url"])
+            emit("Content fetched successfully", 100)
+            return result
             
         elif step_name == "summary":
             # Step 1: Source Assessment + Summarize
@@ -96,7 +115,9 @@ class AnalysisCrew:
             full_text = content_data.get("content", "")
             if content_data["source_type"] == "youtube":
                 full_text = content_data.get("content_with_timestamps", full_text)
-            
+
+            emit("Assessing source credibility...", 10)
+
             # Source Assessment
             content_preview = full_text[:2000] if len(full_text) > 2000 else full_text
             source_task = Task(
@@ -123,7 +144,9 @@ Return as JSON with:
             )
             source_output = self._run_single_task("analyzer", source_task)
             source_assessment = parse_json_output(source_output)
-            
+
+            emit("Source assessment complete. Generating summary...", 50)
+
             # Summarize
             summarize_task = Task(
                 description=f"""Create a focused summary of this content:
@@ -145,13 +168,16 @@ Return as JSON with:
             )
             summarize_output = self._run_single_task("summarizer", summarize_task)
             summary = parse_json_output(summarize_output)
-            
+
+            emit("Summary complete", 100)
+
             return {
                 "source_assessment": source_assessment,
                 "summary": summary
             }
 
         elif step_name == "claims":
+            emit("Extracting and classifying claims...", 10)
             summary = input_data["summary_data"]
             claims_task = Task(
                 description=f"""Extract 5-7 KEY claims from this summary:
@@ -175,13 +201,15 @@ Return as JSON with:
                 agent=self.agents["analyzer"],
             )
             claims_output = self._run_single_task("analyzer", claims_task)
+            emit("Claims extraction complete", 100)
             return parse_json_output(claims_output)
 
         elif step_name == "controversy":
+            emit("Analyzing for controversial content...", 10)
             summary = input_data["summary_data"]
             claims = input_data["claims_data"]
             content = input_data.get("full_text", "")[:3000]
-            
+
             controversy_task = Task(
                 description=f"""Analyze for controversial views and conspiracy patterns:
 Summary: {json.dumps(summary)}
@@ -196,12 +224,14 @@ Return as JSON with:
                 agent=self.agents["controversy_detector"],
             )
             controversy_output = self._run_single_task("controversy_detector", controversy_task)
+            emit("Controversy analysis complete", 100)
             return parse_json_output(controversy_output)
 
         elif step_name == "fallacies":
+            emit("Detecting logical fallacies...", 10)
             claims = input_data["claims_data"]
             full_text = input_data["full_text"]
-            
+
             fallacy_task = Task(
                 description=f"""Analyze these claims for logical fallacies:
 Claims: {json.dumps(claims)}
@@ -217,12 +247,14 @@ Return as JSON with:
                 agent=self.agents["fallacy_detector"],
             )
             fallacy_output = self._run_single_task("fallacy_detector", fallacy_task)
+            emit("Fallacy detection complete", 100)
             return parse_json_output(fallacy_output)
 
         elif step_name == "counterargument":
+            emit("Searching for counterarguments...", 10)
             claims = input_data["claims_data"]
             summary = input_data["summary_data"]
-            
+
             counter_task = Task(
                 description=f"""Find counterarguments to these claims:
 Claims: {json.dumps(claims)}
@@ -238,6 +270,7 @@ Return as JSON with:
                 agent=self.agents["counterargument_searcher"],
             )
             counter_output = self._run_single_task("counterargument_searcher", counter_task)
+            emit("Counterargument search complete", 100)
             return parse_json_output(counter_output)
 
         return {"error": f"Unknown step: {step_name}"}

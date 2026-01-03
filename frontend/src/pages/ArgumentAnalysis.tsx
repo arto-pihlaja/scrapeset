@@ -40,6 +40,8 @@ const ArgumentAnalysis = () => {
     const [error, setError] = useState<string | null>(null)
     const [analysisData, setAnalysisData] = useState<AnalysisData>({})
     const [activeStep, setActiveStep] = useState(0)
+    const [progressMessage, setProgressMessage] = useState<string>('')
+    const [progressPercent, setProgressPercent] = useState<number>(0)
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr)
@@ -59,6 +61,8 @@ const ArgumentAnalysis = () => {
 
         setLoading(stepId)
         setError(null)
+        setProgressMessage('Starting...')
+        setProgressPercent(0)
 
         let previous_data = null
         if (stepId === 'summary') previous_data = savedResultData
@@ -78,10 +82,13 @@ const ArgumentAnalysis = () => {
         }
 
         try {
-            const result = await api.runAnalysisStep({
-                step: stepId,
-                previous_data
-            })
+            const result = await api.runAnalysisStepWithProgress(
+                { step: stepId, previous_data },
+                (message, progress) => {
+                    setProgressMessage(message)
+                    setProgressPercent(progress)
+                }
+            )
 
             if (result.success) {
                 setAnalysisData(prev => ({ ...prev, [stepId]: result.data }))
@@ -93,6 +100,8 @@ const ArgumentAnalysis = () => {
             setError(err.message || 'An unexpected error occurred')
         } finally {
             setLoading(null)
+            setProgressMessage('')
+            setProgressPercent(0)
         }
     }
 
@@ -273,6 +282,22 @@ const ArgumentAnalysis = () => {
                                             </button>
                                         )}
                                     </div>
+
+                                    {isActive && (
+                                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 animate-pulse">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                                                <span className="text-sm text-blue-700 font-medium">{progressMessage || 'Processing...'}</span>
+                                            </div>
+                                            <div className="w-full bg-blue-200 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                    style={{ width: `${progressPercent}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-blue-500 mt-2">This may take several minutes for long content...</p>
+                                        </div>
+                                    )}
 
                                     {isCompleted && (
                                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">

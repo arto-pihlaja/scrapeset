@@ -1,12 +1,12 @@
 """Agent factory functions for CrewAI analysis."""
 
-import os
 from pathlib import Path
 
 import yaml
 from crewai import Agent, LLM
 
 from src.config.settings import settings
+from src.llm.utils import format_model_name, get_api_key_for_model
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,57 +26,19 @@ def load_agent_config() -> dict:
         return yaml.safe_load(f)
 
 
-def _is_valid_api_key(key: str | None) -> bool:
-    """Check if API key is valid (not None, not empty, not a placeholder)."""
-    if not key:
-        return False
-    placeholder_patterns = ["your_", "_here", "sk-xxx", "placeholder"]
-    return not any(p in key.lower() for p in placeholder_patterns)
-
-
 def get_llm() -> LLM:
-    """Get configured LLM instance for agents."""
-    model = settings.default_model
-    provider = settings.default_llm_provider.lower()
-    api_key = None  # Start with None, not a placeholder
+    """Get configured LLM instance for agents.
 
-    # Try configured provider first
-    if provider == "deepseek" and _is_valid_api_key(settings.deepseek_api_key):
-        api_key = settings.deepseek_api_key
-        if not model.startswith("deepseek/"):
-            model = f"deepseek/{model}"
-    elif provider == "openrouter" and _is_valid_api_key(settings.openrouter_api_key):
-        api_key = settings.openrouter_api_key
-        if not model.startswith("openrouter/"):
-            model = f"openrouter/{model}"
-    elif provider == "anthropic" and _is_valid_api_key(settings.anthropic_api_key):
-        api_key = settings.anthropic_api_key
-        if not model.startswith("anthropic/"):
-            model = f"anthropic/{model}"
-    elif provider == "openai" and _is_valid_api_key(settings.openai_api_key):
-        api_key = settings.openai_api_key
-        if "gpt-" in model or "text-" in model:
-            if not model.startswith("openai/"):
-                model = f"openai/{model}"
-
-    # Fallback: find any valid key
-    if not api_key:
-        if _is_valid_api_key(settings.openrouter_api_key):
-            api_key = settings.openrouter_api_key
-            model = f"openrouter/{settings.default_model}"
-        elif _is_valid_api_key(settings.deepseek_api_key):
-            api_key = settings.deepseek_api_key
-            model = f"deepseek/{settings.default_model}"
-        elif _is_valid_api_key(settings.anthropic_api_key):
-            api_key = settings.anthropic_api_key
-            model = f"anthropic/{settings.default_model}"
-        elif _is_valid_api_key(settings.openai_api_key):
-            api_key = settings.openai_api_key
+    Uses shared utilities for model formatting and API key selection,
+    ensuring consistent behavior with LLMClient used for chat/RAG.
+    """
+    model = format_model_name(settings.default_model)
+    api_key = get_api_key_for_model(model)
 
     if not api_key:
         raise ValueError("No valid API key configured. Please set a valid API key in .env")
 
-    logger.info(f"Using LLM: {model} with provider: {provider}")
+    logger.info(f"Using LLM: {model}")
 
     return LLM(
         model=model,

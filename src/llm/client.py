@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import litellm
 
 from src.config import settings
+from src.llm.utils import format_model_name
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -47,46 +48,8 @@ class LLMClient:
                 litellm.openai_key = settings.llm_api_key
 
         # Set default model with proper provider prefix
-        self.model = self._format_model_name(settings.default_model)
+        self.model = format_model_name(settings.default_model)
         logger.info(f"LLM client initialized with model: {self.model}")
-
-    def _format_model_name(self, model: str) -> str:
-        """Format model name with proper provider prefix for LiteLLM."""
-        # If model already has a provider prefix, return as-is
-        if "/" in model:
-            return model
-
-        # 1. Check explicit provider setting (except default openai)
-        provider = settings.default_llm_provider.lower()
-        if provider and provider != "openai":
-            # Map common provider names to LiteLLM prefixes if necessary
-            mapping = {
-                "deepseek": "deepseek",
-                "openrouter": "openrouter",
-                "anthropic": "anthropic",
-            }
-            prefix = mapping.get(provider, provider)
-            return f"{prefix}/{model}"
-
-        # 2. Auto-detect provider based on available API keys and model patterns
-        if settings.openai_api_key and (model.startswith("gpt-") or model.startswith("text-")):
-            return f"openai/{model}"
-        
-        if settings.deepseek_api_key and (model.startswith("deepseek-")):
-            return f"deepseek/{model}"
-
-        if settings.anthropic_api_key and "claude" in model:
-            return f"anthropic/{model}"
-            
-        if settings.openrouter_api_key:
-            # Fallback for OpenRouter if we have the key but no clear pattern
-            return f"openrouter/{model}"
-
-        # 3. Fallback to generic OpenAI if API base is set
-        if settings.llm_api_base:
-            return f"openai/{model}"
-
-        return model
 
     def _build_rag_prompt(
         self,
