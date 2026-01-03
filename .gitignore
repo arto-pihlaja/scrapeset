@@ -167,3 +167,8 @@ frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 frontend/node_modules/
+
+#BMAD
+.bmad
+_bmad/
+_bmad-output/

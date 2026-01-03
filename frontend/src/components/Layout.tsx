@@ -24,9 +24,9 @@ const Layout = ({ children }: LayoutProps) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Scrape Web', href: '/scrape', icon: Globe },
+    { name: 'Saved Results', href: '/saved-results', icon: Database },
     { name: 'Argument Analysis', href: '/analysis', icon: ShieldAlert },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
-    { name: 'Collections', href: '/collections', icon: Database },
     { name: 'Conversations', href: '/conversations', icon: History },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]

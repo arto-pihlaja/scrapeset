@@ -103,6 +103,28 @@ export interface ChatSession {
   last_updated?: string
 }
 
+export interface ScrapeResultSummary {
+  id: number
+  name: string
+  url: string
+  title: string | null
+  char_count: number
+  saved_at: string
+  vector_collection: string | null
+  preview: string
+}
+
+export interface ScrapeResultFull {
+  id: number
+  name: string
+  url: string
+  title: string | null
+  content: string
+  char_count: number
+  saved_at: string
+  vector_collection: string | null
+}
+
 export const api = {
   // Health check
   async healthCheck() {
@@ -226,6 +248,53 @@ export const api = {
     previous_data?: any
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     const response = await axiosInstance.post('/analysis/step', data)
+    return response.data
+  },
+
+  // Saved Results
+  async saveResult(data: {
+    name: string
+    url: string
+    title?: string
+    content: string
+  }): Promise<{ success: boolean; result_id?: number; error_message?: string }> {
+    const response = await axiosInstance.post('/results/save', data)
+    return response.data
+  },
+
+  async getResults(): Promise<{ success: boolean; results: ScrapeResultSummary[] }> {
+    const response = await axiosInstance.get('/results')
+    return response.data
+  },
+
+  async getResult(resultId: number): Promise<{ success: boolean; result: ScrapeResultFull }> {
+    const response = await axiosInstance.get(`/results/${resultId}`)
+    return response.data
+  },
+
+  async deleteResult(resultId: number): Promise<{ success: boolean; message: string }> {
+    const response = await axiosInstance.delete(`/results/${resultId}`)
+    return response.data
+  },
+
+  async createVectorDB(
+    resultId: number,
+    collectionName?: string
+  ): Promise<{
+    success: boolean
+    collection_name?: string
+    chunks_created?: number
+    stats?: any
+    error?: string
+  }> {
+    const response = await axiosInstance.post(`/results/${resultId}/create-vector-db`, {
+      collection_name: collectionName
+    })
+    return response.data
+  },
+
+  async deleteVectorDB(resultId: number): Promise<{ success: boolean; message?: string; error?: string }> {
+    const response = await axiosInstance.delete(`/results/${resultId}/vector-db`)
     return response.data
   }
 }

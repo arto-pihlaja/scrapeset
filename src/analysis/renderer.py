@@ -90,37 +90,34 @@ class ReportRenderer:
         return html
 
     def render_claims(self, data: dict[str, Any]) -> str:
-        """Render extracted claims and entities."""
+        """Render extracted claims with evidence."""
         type_colors = {
             "factual": "bg-blue-100 text-blue-700",
+            "unsupported": "bg-yellow-100 text-yellow-700",
             "opinion": "bg-purple-100 text-purple-700",
             "prediction": "bg-orange-100 text-orange-700"
         }
-        
+
         html = f"""
         <div class="mb-8">
-            <h2 class="text-2xl font-bold mb-4">Key Claims & Entities</h2>
-            <div class="grid md:grid-cols-3 gap-6">
-                <div class="md:col-span-2">
-                    <h3 class="text-lg font-semibold mb-3">Significant Claims</h3>
-                    <ul class="space-y-3">
-                        {" ".join([f'''
-                            <li class="p-3 bg-white rounded border border-gray-100 shadow-sm">
-                                <span class="px-2 py-0.5 rounded-full text-xs font-bold uppercase {type_colors.get(c.get('type', 'factual'), type_colors['factual'])} mr-2">
-                                    {c.get('type', 'factual')}
-                                </span>
-                                {c.get('text', '')}
-                            </li>
-                        ''' for c in data.get('claims', [])])}
-                    </ul>
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold mb-3">Core Entities</h3>
-                    <div class="flex flex-wrap gap-2">
-                        {" ".join([f'<span class="px-3 py-1 bg-gray-100 rounded-full text-sm">{e}</span>' for e in data.get('key_entities', [])])}
-                    </div>
-                </div>
-            </div>
+            <h2 class="text-2xl font-bold mb-4">Key Claims</h2>
+            <ul class="space-y-3">
+                {" ".join([f'''
+                    <li class="p-3 bg-white rounded border border-gray-100 shadow-sm">
+                        <div class="flex items-start gap-2">
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold uppercase {type_colors.get(c.get('type', 'unsupported'), type_colors['unsupported'])} flex-shrink-0">
+                                {c.get('type', 'unsupported')}
+                            </span>
+                            <div>
+                                <div class="font-medium">{c.get('text', '')}</div>
+                                <div class="text-xs text-gray-500 mt-1 italic">
+                                    Evidence: {c.get('evidence', 'Not analyzed')}
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                ''' for c in data.get('claims', [])])}
+            </ul>
         </div>
         """
         return html

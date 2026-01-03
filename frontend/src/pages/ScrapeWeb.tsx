@@ -1,49 +1,30 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Globe, Loader2, CheckCircle, XCircle, Download, ArrowRight } from 'lucide-react'
+import { Globe, Loader2, CheckCircle, XCircle, Download, ArrowRight, Save } from 'lucide-react'
 import { api, ScrapeResponse } from '../services/api'
-
-interface TextElement {
-  id: number
-  content: string
-  tag: string
-  preview: string
-  word_count: number
-  char_count: number
-  selected?: boolean
-}
 
 const ScrapeWeb = () => {
   const navigate = useNavigate()
   const [url, setUrl] = useState('')
-  const [collection, setCollection] = useState('')
   const [loading, setLoading] = useState(false)
   const [scrapeResult, setScrapeResult] = useState<ScrapeResponse | null>(null)
-  const [textElements, setTextElements] = useState<TextElement[]>([])
-  const [processing, setProcessing] = useState(false)
   const [dynamic, setDynamic] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [saveName, setSaveName] = useState('')
 
   const handleScrape = async () => {
     if (!url.trim()) return
 
     setLoading(true)
+    setScrapeResult(null)
     try {
       const result = await api.scrapeUrl({
         url: url.trim(),
-        collection: collection.trim() || undefined,
         interactive: true,
         dynamic: dynamic
       })
-
       setScrapeResult(result)
-
-      if (result.success) {
-        const elementsWithSelection = result.text_elements.map(el => ({
-          ...el,
-          selected: true // Default to selected
-        }))
-        setTextElements(elementsWithSelection)
-      }
     } catch (error) {
       console.error('Scraping failed:', error)
       setScrapeResult({
@@ -58,62 +39,14 @@ const ScrapeWeb = () => {
     }
   }
 
-  const toggleElement = (id: number) => {
-    setTextElements(prev =>
-      prev.map(el =>
-        el.id === id ? { ...el, selected: !el.selected } : el
-      )
-    )
-  }
-
-  const selectAll = () => {
-    setTextElements(prev => prev.map(el => ({ ...el, selected: true })))
-  }
-
-  const deselectAll = () => {
-    setTextElements(prev => prev.map(el => ({ ...el, selected: false })))
-  }
-
-  const handleAddToCollection = async () => {
-    if (!scrapeResult?.success) return
-
-    const selectedElements = textElements.filter(el => el.selected)
-    if (selectedElements.length === 0) {
-      alert('Please select at least one text element.')
-      return
-    }
-
-    setProcessing(true)
-    try {
-      const result = await api.addToCollection({
-        url: url.trim(),
-        title: scrapeResult.title,
-        selected_elements: selectedElements,
-        collection: collection.trim() || undefined
-      })
-
-      if (result.success) {
-        alert(`Successfully added ${result.chunks_created} chunks to collection!`)
-        // Reset form
-        setUrl('')
-        setCollection('')
-        setScrapeResult(null)
-        setTextElements([])
-      } else {
-        alert('Failed to add to collection: ' + result.error)
-      }
-    } catch (error) {
-      console.error('Failed to add to collection:', error)
-      alert('Failed to add to collection. Please try again.')
-    } finally {
-      setProcessing(false)
-    }
+  const getFullContent = () => {
+    if (!scrapeResult?.success) return ''
+    return scrapeResult.text_elements.map(el => el.content).join('\n\n')
   }
 
   const handleDownload = () => {
     if (!scrapeResult?.success) return
-
-    const fullText = textElements.map(el => el.content).join('\n\n')
+    const fullText = getFullContent()
     const blob = new Blob([fullText], { type: 'text/plain' })
     const downloadUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -127,8 +60,7 @@ const ScrapeWeb = () => {
 
   const handleAnalyzeContent = () => {
     if (!scrapeResult?.success) return
-
-    const fullContent = textElements.map(el => el.content).join('\n\n')
+    const fullContent = getFullContent()
     navigate('/analysis', {
       state: {
         preScrapedData: {
@@ -142,7 +74,33 @@ const ScrapeWeb = () => {
     })
   }
 
-  const selectedCount = textElements.filter(el => el.selected).length
+  const handleSaveResults = async () => {
+    if (!scrapeResult?.success || !saveName.trim()) return
+
+    setSaving(true)
+    try {
+      const fullContent = getFullContent()
+      const result = await api.saveResult({
+        name: saveName.trim(),
+        url: url.trim(),
+        title: scrapeResult.title,
+        content: fullContent
+      })
+
+      if (result.success) {
+        setShowSaveModal(false)
+        setSaveName('')
+        navigate('/saved-results')
+      } else {
+        alert('Failed to save: ' + result.error_message)
+      }
+    } catch (error) {
+      console.error('Failed to save results:', error)
+      alert('Failed to save results. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -150,7 +108,7 @@ const ScrapeWeb = () => {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Scrape Website</h1>
         <p className="mt-2 text-gray-600">
-          Extract content from any website and add it to your collection
+          Extract content from any website and save it for later use
         </p>
       </div>
 
@@ -169,20 +127,6 @@ const ScrapeWeb = () => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="collection" className="block text-sm font-medium text-gray-700">
-              Collection Name (optional)
-            </label>
-            <input
-              type="text"
-              id="collection"
-              value={collection}
-              onChange={(e) => setCollection(e.target.value)}
-              placeholder="Leave empty to use default collection"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -231,17 +175,24 @@ const ScrapeWeb = () => {
                   Found {scrapeResult.text_elements.length} text elements
                   ({scrapeResult.total_text_length.toLocaleString()} characters total)
                 </p>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={handleDownload}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Download as Plain Text
+                    Download as Text
+                  </button>
+                  <button
+                    onClick={() => setShowSaveModal(true)}
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded text-white bg-green-600 hover:bg-green-700"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Results
                   </button>
                   <button
                     onClick={handleAnalyzeContent}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded text-white bg-purple-600 hover:bg-purple-700"
                   >
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Analyze Content
@@ -249,89 +200,13 @@ const ScrapeWeb = () => {
                 </div>
               </div>
 
+              {/* Content Preview */}
               <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Scraped Text Preview</h3>
-                <div
-                  className="bg-gray-50 p-4 rounded border border-gray-200 h-64 overflow-y-auto whitespace-pre-wrap font-mono text-sm text-gray-700"
-                  id="scraped-text-preview"
-                >
-                  {scrapeResult.text_elements.map(el => el.content).join('\n\n')}
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Scraped Content Preview</h3>
+                <div className="bg-gray-50 p-4 rounded border border-gray-200 h-64 overflow-y-auto whitespace-pre-wrap font-mono text-sm text-gray-700">
+                  {getFullContent()}
                 </div>
               </div>
-
-              {textElements.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Select Text Elements ({selectedCount}/{textElements.length})
-                    </h3>
-                    <div className="space-x-2">
-                      <button
-                        onClick={selectAll}
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        Select All
-                      </button>
-                      <button
-                        onClick={deselectAll}
-                        className="text-sm text-gray-600 hover:text-gray-800"
-                      >
-                        Deselect All
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {textElements.map((element) => (
-                      <div
-                        key={element.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${element.selected
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
-                          }`}
-                        onClick={() => toggleElement(element.id)}
-                      >
-                        <div className="flex items-start space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={element.selected}
-                            onChange={() => toggleElement(element.id)}
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                                {element.tag}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {element.word_count} words
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-700">{element.preview}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedCount > 0 && (
-                    <div className="mt-6 pt-4 border-t">
-                      <button
-                        onClick={handleAddToCollection}
-                        disabled={processing}
-                        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                      >
-                        {processing ? (
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        ) : (
-                          <CheckCircle className="h-5 w-5 mr-2" />
-                        )}
-                        {processing ? 'Adding to Collection...' : `Add ${selectedCount} Elements to Collection`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -342,6 +217,62 @@ const ScrapeWeb = () => {
               <p className="text-red-600">{scrapeResult.error_message}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Save Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div
+              className="fixed inset-0 bg-gray-500 opacity-75"
+              onClick={() => setShowSaveModal(false)}
+            ></div>
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Save Scraping Results</h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="saveName" className="block text-sm font-medium text-gray-700">
+                    Name for this result
+                  </label>
+                  <input
+                    type="text"
+                    id="saveName"
+                    value={saveName}
+                    onChange={(e) => setSaveName(e.target.value)}
+                    placeholder="e.g., Research Article on AI"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && saveName.trim()) {
+                        handleSaveResults()
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowSaveModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveResults}
+                    disabled={saving || !saveName.trim()}
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

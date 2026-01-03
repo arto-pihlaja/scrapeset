@@ -11,12 +11,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+import re
+
 from src.config import settings, ensure_directories
 from src.scraper import WebScraper, ScrapedContent
 from src.text import TextProcessor
 from src.vector import VectorStore
 from src.llm import LLMClient
 from src.conversation import ConversationMemory
+from src.storage import ResultsStore
 from src.utils.logger import setup_logging, get_logger
 
 
@@ -132,6 +135,24 @@ class ChatResponse(BaseModel):
     collections_used: Optional[List[str]] = None
     results_per_collection: Optional[Dict[str, int]] = None
     error_message: Optional[str] = None
+
+
+# Saved Results models
+class SaveResultRequest(BaseModel):
+    name: str
+    url: str
+    title: Optional[str] = None
+    content: str
+
+
+class SaveResultResponse(BaseModel):
+    success: bool
+    result_id: Optional[int] = None
+    error_message: Optional[str] = None
+
+
+class CreateVectorDBRequest(BaseModel):
+    collection_name: Optional[str] = None
 
 
 # API Routes
@@ -537,6 +558,179 @@ async def drop_collection(collection_name: str):
         return {"success": success, "operation": "drop"}
     except Exception as e:
         logger.error(f"Failed to drop collection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Saved Results endpoints
+
+@app.post("/api/results/save", response_model=SaveResultResponse)
+async def save_scrape_result(request: SaveResultRequest):
+    """Save scraped content to SQLite database."""
+    try:
+        results_store = ResultsStore()
+        result_id = results_store.save_result(
+            name=request.name,
+            url=request.url,
+            title=request.title,
+            content=request.content
+        )
+        return SaveResultResponse(success=True, result_id=result_id)
+    except Exception as e:
+        logger.error(f"Failed to save result: {e}")
+        return SaveResultResponse(success=False, error_message=str(e))
+
+
+@app.get("/api/results")
+async def list_scrape_results():
+    """Get all saved scraping results."""
+    try:
+        results_store = ResultsStore()
+        results = results_store.list_results()
+        return {"success": True, "results": results}
+    except Exception as e:
+        logger.error(f"Failed to list results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/results/{result_id}")
+async def get_scrape_result(result_id: int):
+    """Get a single scraping result by ID."""
+    try:
+        results_store = ResultsStore()
+        result = results_store.get_result(result_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Result not found")
+        return {
+            "success": True,
+            "result": {
+                "id": result.id,
+                "name": result.name,
+                "url": result.url,
+                "title": result.title,
+                "content": result.content,
+                "char_count": result.char_count,
+                "saved_at": result.saved_at.isoformat(),
+                "vector_collection": result.vector_collection
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get result: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/results/{result_id}")
+async def delete_scrape_result(result_id: int):
+    """Delete a scraping result."""
+    try:
+        results_store = ResultsStore()
+
+        # Get result to check if it has a vector collection
+        result = results_store.get_result(result_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="Result not found")
+
+        # Optionally drop the vector collection if it exists
+        if result.vector_collection:
+            try:
+                store = VectorStore(collection_name=result.vector_collection)
+                store.drop_collection()
+            except Exception as e:
+                logger.warning(f"Failed to drop vector collection: {e}")
+
+        deleted = results_store.delete_result(result_id)
+        return {"success": deleted, "message": "Result deleted" if deleted else "Result not found"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete result: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/results/{result_id}/create-vector-db")
+async def create_vector_db_from_result(result_id: int, request: CreateVectorDBRequest):
+    """Create a vector database from a saved scraping result."""
+    try:
+        results_store = ResultsStore()
+        result = results_store.get_result(result_id)
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Result not found")
+
+        if result.vector_collection:
+            return {
+                "success": False,
+                "error": f"Vector DB already exists: {result.vector_collection}"
+            }
+
+        # Generate collection name if not provided
+        collection_name = request.collection_name
+        if not collection_name:
+            # Create a safe collection name from the result name
+            safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', result.name.lower())
+            collection_name = f"result_{result.id}_{safe_name[:30]}"
+
+        # Create text processor and vector store
+        text_processor = TextProcessor()
+        store = VectorStore(collection_name=collection_name)
+
+        # Create chunks from content
+        chunks = text_processor.create_chunks(
+            text=result.content,
+            source_url=result.url,
+            source_title=result.title or result.name
+        )
+
+        # Add to vector store
+        success = store.add_chunks(chunks)
+
+        if success:
+            # Update the result with the collection name
+            results_store.update_vector_collection(result_id, collection_name)
+            stats = store.get_collection_stats()
+            return {
+                "success": True,
+                "collection_name": collection_name,
+                "chunks_created": len(chunks),
+                "stats": stats
+            }
+        else:
+            return {"success": False, "error": "Failed to add chunks to vector store"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to create vector DB: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/results/{result_id}/vector-db")
+async def delete_vector_db_for_result(result_id: int):
+    """Delete the vector database for a result (but keep the result)."""
+    try:
+        results_store = ResultsStore()
+        result = results_store.get_result(result_id)
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Result not found")
+
+        if not result.vector_collection:
+            return {"success": False, "error": "No vector DB exists for this result"}
+
+        # Drop the collection
+        store = VectorStore(collection_name=result.vector_collection)
+        store.drop_collection()
+
+        # Clear the reference
+        results_store.clear_vector_collection(result_id)
+
+        return {"success": True, "message": "Vector DB deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete vector DB: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

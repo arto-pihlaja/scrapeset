@@ -1,21 +1,19 @@
-import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-    Search,
     Loader2,
-    ChevronRight,
     FileText,
     List,
     AlertTriangle,
     ShieldAlert,
     RotateCcw,
     ArrowRight,
-    CheckCircle
+    Calendar,
+    FileSearch
 } from 'lucide-react'
 import api from '../services/api'
 
 interface AnalysisData {
-    fetch?: any
     summary?: any
     claims?: any
     controversy?: any
@@ -23,7 +21,9 @@ interface AnalysisData {
     counterargument?: any
 }
 
-interface PreScrapedData {
+interface SavedResultData {
+    name: string
+    saved_at: string
     source_type: string
     url: string
     title: string
@@ -33,24 +33,20 @@ interface PreScrapedData {
 
 const ArgumentAnalysis = () => {
     const location = useLocation()
-    const preScrapedData = (location.state as { preScrapedData?: PreScrapedData })?.preScrapedData
+    const navigate = useNavigate()
+    const savedResultData = (location.state as { savedResultData?: SavedResultData })?.savedResultData
 
-    const [url, setUrl] = useState(preScrapedData?.url || '')
     const [loading, setLoading] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [analysisData, setAnalysisData] = useState<AnalysisData>({})
     const [activeStep, setActiveStep] = useState(0)
 
-    // Auto-populate fetch data if pre-scraped content is available
-    useEffect(() => {
-        if (preScrapedData) {
-            setAnalysisData({ fetch: preScrapedData })
-            setActiveStep(1)
-        }
-    }, [])
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr)
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
 
     const steps = [
-        { id: 'fetch', name: 'Source Extraction', icon: Search },
         { id: 'summary', name: 'Summary', icon: FileText },
         { id: 'claims', name: 'Key Claims', icon: List },
         { id: 'controversy', name: 'Controversy', icon: ShieldAlert },
@@ -59,20 +55,22 @@ const ArgumentAnalysis = () => {
     ]
 
     const runStep = async (stepId: string) => {
+        if (!savedResultData) return
+
         setLoading(stepId)
         setError(null)
 
         let previous_data = null
-        if (stepId === 'summary') previous_data = analysisData.fetch
+        if (stepId === 'summary') previous_data = savedResultData
         else if (stepId === 'claims') previous_data = analysisData.summary
         else if (stepId === 'controversy') previous_data = {
             summary: analysisData.summary.summary,
             claims: analysisData.claims,
-            full_text: analysisData.fetch.content || analysisData.fetch.transcript
+            full_text: savedResultData.content
         }
         else if (stepId === 'fallacies') previous_data = {
             claims: analysisData.claims,
-            full_text: analysisData.fetch.content || analysisData.fetch.transcript
+            full_text: savedResultData.content
         }
         else if (stepId === 'counterargument') previous_data = {
             claims: analysisData.claims,
@@ -82,7 +80,6 @@ const ArgumentAnalysis = () => {
         try {
             const result = await api.runAnalysisStep({
                 step: stepId,
-                url: stepId === 'fetch' ? url : undefined,
                 previous_data
             })
 
@@ -104,16 +101,6 @@ const ArgumentAnalysis = () => {
         if (!data) return null
 
         switch (stepId) {
-            case 'fetch':
-                return (
-                    <div className="bg-white p-4 rounded-lg shadow-sm border">
-                        <h3 className="font-bold text-lg mb-2">{data.title}</h3>
-                        <p className="text-sm text-gray-500 mb-4">{data.url}</p>
-                        <div className="max-h-60 overflow-y-auto text-sm text-gray-700 bg-gray-50 p-3 rounded">
-                            {data.content || data.transcript}
-                        </div>
-                    </div>
-                )
             case 'summary':
                 return (
                     <div className="space-y-4">
@@ -139,28 +126,28 @@ const ArgumentAnalysis = () => {
                 )
             case 'claims':
                 return (
-                    <div className="grid md:grid-cols-3 gap-4">
-                        <div className="md:col-span-2 space-y-2">
-                            <h3 className="font-bold">Significant Claims</h3>
-                            {data.claims.map((c: any, i: number) => (
-                                <div key={i} className="p-3 bg-white rounded border border-gray-100 shadow-sm flex items-center gap-2">
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${c.type === 'factual' ? 'bg-blue-100 text-blue-700' :
-                                        c.type === 'opinion' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
-                                        }`}>
+                    <div className="space-y-2">
+                        <h3 className="font-bold">Significant Claims</h3>
+                        {data.claims.map((c: any, i: number) => (
+                            <div key={i} className="p-3 bg-white rounded border border-gray-100 shadow-sm">
+                                <div className="flex items-start gap-2">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0 ${
+                                        c.type === 'factual' ? 'bg-blue-100 text-blue-700' :
+                                        c.type === 'unsupported' ? 'bg-yellow-100 text-yellow-700' :
+                                        c.type === 'opinion' ? 'bg-purple-100 text-purple-700' :
+                                        'bg-orange-100 text-orange-700'
+                                    }`}>
                                         {c.type}
                                     </span>
                                     <span className="text-sm">{c.text}</span>
                                 </div>
-                            ))}
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="font-bold">Entities</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {data.key_entities.map((e: string, i: number) => (
-                                    <span key={i} className="px-2 py-1 bg-gray-100 rounded text-xs">{e}</span>
-                                ))}
+                                {c.evidence && (
+                                    <div className="mt-2 text-xs text-gray-500 italic pl-2 border-l-2 border-gray-200">
+                                        <span className="font-medium text-gray-600">Evidence:</span> {c.evidence}
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        ))}
                     </div>
                 )
             case 'controversy':
@@ -233,34 +220,25 @@ const ArgumentAnalysis = () => {
                 <h1 className="text-2xl font-bold text-gray-900 mb-2">Argument Analysis</h1>
                 <p className="text-gray-500 mb-6">Analyze content for logical consistency, claims, and controversies using multi-agent orchestration.</p>
 
-                {preScrapedData ? (
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center gap-2 text-green-800">
-                            <CheckCircle className="h-5 w-5" />
-                            <span className="font-medium">Content pre-loaded from scraper</span>
+                {savedResultData ? (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h3 className="font-bold text-lg text-gray-900">{savedResultData.name}</h3>
+                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                            <Calendar className="h-4 w-4" />
+                            <span>Saved {formatDate(savedResultData.saved_at)}</span>
                         </div>
-                        <p className="mt-1 text-sm text-green-700">
-                            <span className="font-medium">{preScrapedData.title}</span> — {preScrapedData.url}
-                        </p>
-                        <p className="mt-2 text-xs text-green-600">Click "Run Step" on Summary to continue the analysis.</p>
+                        <p className="mt-2 text-xs text-blue-600">Click "Run Step" on Summary to start the analysis.</p>
                     </div>
                 ) : (
-                    <div className="flex gap-4">
-                        <input
-                            type="text"
-                            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="Enter YouTube or Web URL..."
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            disabled={loading !== null}
-                        />
+                    <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                        <FileSearch className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                        <h3 className="font-medium text-gray-900 mb-1">No result selected</h3>
+                        <p className="text-sm text-gray-500 mb-4">Select a saved result to analyze its content.</p>
                         <button
-                            onClick={() => runStep('fetch')}
-                            disabled={!url || loading !== null}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                            onClick={() => navigate('/saved-results')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                         >
-                            {loading === 'fetch' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
-                            Start Analysis
+                            Go to Saved Results
                         </button>
                     </div>
                 )}
@@ -269,7 +247,7 @@ const ArgumentAnalysis = () => {
 
             <div className="space-y-4">
                 {steps.map((step, index) => {
-                    const isEnabled = index <= activeStep && (index === 0 || (analysisData as any)[steps[index - 1].id])
+                    const isEnabled = savedResultData && index <= activeStep && (index === 0 || (analysisData as any)[steps[index - 1].id])
                     const isCompleted = !!(analysisData as any)[step.id]
                     const isActive = loading === step.id
                     const Icon = step.icon

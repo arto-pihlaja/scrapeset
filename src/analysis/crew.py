@@ -157,17 +157,21 @@ Return as JSON with:
                 description=f"""Extract 5-7 KEY claims from this summary:
 {json.dumps(summary, indent=2)}
 
-For each claim:
-- text (concise)
-- type: "factual", "opinion", or "prediction"
+For each claim, classify using these STRICT criteria:
+- "factual": Claim is SUPPORTED by specific evidence in the content (data, citations, studies, statistics)
+- "unsupported": Claim is stated as fact but NO evidence is provided to back it up
+- "opinion": Expresses subjective view, preference, or value judgment
+- "prediction": Makes assertions about future events
 
-Also identify 3-5 key entities.
+For each claim provide:
+- text: The claim stated concisely
+- type: One of "factual", "unsupported", "opinion", or "prediction"
+- evidence: What evidence supports/contradicts this claim, or "No supporting evidence in source"
 
 Return as JSON with:
-- claims: array of {{text, type}} (MAX 7)
-- key_entities: array of strings (MAX 5)
+- claims: array of {{text, type, evidence}} (MAX 7)
 - main_topic: string""",
-                expected_output="JSON object with claims, key_entities, and main_topic",
+                expected_output="JSON object with claims (including evidence) and main_topic",
                 agent=self.agents["analyzer"],
             )
             claims_output = self._run_single_task("analyzer", claims_task)
