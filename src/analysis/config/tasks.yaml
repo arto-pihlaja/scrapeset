@@ -1,89 +1,107 @@
-fetch_content:
-  description: >
-    Extract content from the provided URL: {url}
+source_assessment:
+  description: |
+    Assess the credibility of this source:
+    Title: {title}
+    Type: {source_type}
+    URL: {url}
+    Metadata: {metadata}
 
-    If it's a regular webpage:
-    - Extract the main text content
-    - Get the page title and any author/date information
+    Content preview:
+    {content_preview}
 
-    If it's a YouTube video:
-    - Extract the full transcript with timestamps
-    - Get video metadata: title, channel name, description, duration
+    Evaluate:
+    1. Source credibility (high/medium/low/unknown)
+    2. Reasoning for your assessment
+    3. Potential biases you can identify
 
-    Return the content in a structured format.
-  expected_output: >
-    A JSON object with:
-    - source_type: "webpage" or "youtube"
-    - url: the original URL
-    - title: page/video title
-    - content: full text content or transcript
-    - metadata: object with author, publish_date, channel, duration, description as applicable
-  agent: fetcher
-
-analyze_content:
-  description: >
-    Analyze the following content and extract structured information:
-
-    {content}
-
-    Identify:
-    1. All significant claims made 
-    2. The main topic and central argument
-    3. Source credibility assessment with reasoning
-    4. Potential biases in the content
-
-    For each claim, note its location (paragraph number or timestamp).
-  expected_output: >
-    A JSON object with:
-    - claims: array of {id, text, location}
-    - main_topic: string
-    - source_assessment: {credibility: high/medium/low/unknown, reasoning: string, potential_biases: array}
+    Return as JSON with:
+    - credibility: "high", "medium", "low", or "unknown"
+    - reasoning: string explaining your assessment
+    - potential_biases: array of identified biases
+  expected_output: "JSON object with credibility, reasoning, and potential_biases"
   agent: analyzer
 
-detect_fallacies:
-  description: >
-    Review the following claims and content for logical fallacies:
-
-    Claims:
-    {claims}
-
-    Original content:
-    {content}
-
-    For each fallacy found:
-    1. Identify the fallacy type
-    2. Quote the exact text containing the fallacy
-    3. Note the location (paragraph/timestamp)
-    4. Explain why it's a fallacy
-
-    If no fallacies are found, return an empty fallacies array.
-  expected_output: >
-    A JSON object with:
-    - fallacies: array of {type, claim_id, quote, location, explanation, counterargument_search}
-    - overall_reasoning_quality: "strong", "moderate", or "weak"
-  agent: fallacy_detector
-
-summarize_content:
-  description: >
-    Create a summary of the analyzed content:
-
-    Original content:
-    {content}
-
-    Analysis results:
-    {analysis}
+summarize:
+  description: |
+    Create a focused summary of this content:
+    {full_text}
 
     Create:
-    1. A 2-3 paragraph summary capturing the essence
-    2. A list of key points with their locations (paragraph numbers or timestamps)
-    3. The main argument or thesis
+    1. A 2-3 paragraph summary
+    2. 5-7 key points (with timestamps if video)
+    3. Main argument
     4. Key conclusions
 
-    For video content, include timestamps for easy reference.
-  expected_output: >
-    A JSON object with:
-    - summary: string (2-3 paragraphs)
-    - key_points: array of {point, location}
+    Return as JSON with:
+    - summary: string
+    - key_points: array of {point, location} (MAX 7)
     - main_argument: string
     - conclusions: array of strings
+  expected_output: "JSON object with summary, key_points, main_argument, and conclusions"
   agent: summarizer
+
+claims:
+  description: |
+    Extract 5-7 KEY claims from this summary:
+    {summary}
+
+    For each claim, classify using these STRICT criteria:
+    - "factual": Claim is SUPPORTED by specific evidence in the content (data, citations, studies, statistics)
+    - "unsupported": Claim is stated as fact but NO evidence is provided to back it up
+    - "opinion": Expresses subjective view, preference, or value judgment
+    - "prediction": Makes assertions about future events
+
+    For each claim provide:
+    - text: The claim stated concisely
+    - type: One of "factual", "unsupported", "opinion", or "prediction"
+    - evidence: What evidence supports/contradicts this claim, or "No supporting evidence in source"
+
+    Return as JSON with:
+    - claims: array of {text, type, evidence} (MAX 7)
+    - main_topic: string
+  expected_output: "JSON object with claims (including evidence) and main_topic"
+  agent: analyzer
+
+controversy:
+  description: |
+    Analyze for controversial views and conspiracy patterns:
+    Summary: {summary}
+    Claims: {claims}
+    Context: {content}
+
+    Return as JSON with:
+    - controversial_views: array of {target, sentiment, claim_text, reasoning}
+    - conspiracy_indicators: array of {pattern, severity, evidence, quote}
+    - overall_assessment: {controversy_level, summary}
+  expected_output: "JSON object with controversial_views, conspiracy_indicators, and overall_assessment"
+  agent: controversy_detector
+
+fallacies:
+  description: |
+    Analyze these claims for logical fallacies:
+    Claims: {claims}
+    Text: {full_text}
+
+    For each ACTUAL fallacy:
+    - type, quote, location, explanation
+
+    Return as JSON with:
+    - fallacies: array of {type, quote, location, explanation}
+    - overall_reasoning_quality: "strong", "moderate", or "weak"
+  expected_output: "JSON object with fallacies array and overall_reasoning_quality"
+  agent: fallacy_detector
+
+counterargument:
+  description: |
+    Find counterarguments to these claims:
+    Claims: {claims}
+    Summary: {summary}
+
+    Use web_search tool to find real sources.
+
+    Return as JSON with:
+    - selected_claims: array
+    - counterargument: string (~100 words)
+    - sources: array of {title, url}
+  expected_output: "JSON object with selected_claims, counterargument, and sources"
+  agent: counterargument_searcher

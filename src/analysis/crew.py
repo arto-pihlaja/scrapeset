@@ -4,11 +4,19 @@ import json
 import re
 from typing import Any, Callable
 
-from crewai import Crew, Task, Process
+from crewai import Crew, Process, Task
 
 from .agents import create_all_agents
 from .tools import YouTubeMetadataTool, WebContentTool
 from .renderer import ReportRenderer, parse_json_output
+from .tasks import (
+    create_source_assessment_task,
+    create_summarize_task,
+    create_claims_task,
+    create_controversy_task,
+    create_fallacies_task,
+    create_counterargument_task,
+)
 
 
 def is_youtube_url(url: str) -> bool:
@@ -120,27 +128,13 @@ class AnalysisCrew:
 
             # Source Assessment
             content_preview = full_text[:2000] if len(full_text) > 2000 else full_text
-            source_task = Task(
-                description=f"""Assess the credibility of this source:
-Title: {content_data.get('title', 'Unknown')}
-Type: {content_data['source_type']}
-URL: {content_data.get('url', 'N/A')}
-Metadata: {json.dumps(content_data.get('metadata', {}), indent=2)}
-
-Content preview:
-{content_preview}
-
-Evaluate:
-1. Source credibility (high/medium/low/unknown)
-2. Reasoning for your assessment
-3. Potential biases you can identify
-
-Return as JSON with:
-- credibility: "high", "medium", "low", or "unknown"
-- reasoning: string explaining your assessment
-- potential_biases: array of identified biases""",
-                expected_output="JSON object with credibility, reasoning, and potential_biases",
+            source_task = create_source_assessment_task(
                 agent=self.agents["analyzer"],
+                title=content_data.get("title", "Unknown"),
+                source_type=content_data["source_type"],
+                url=content_data.get("url", "N/A"),
+                metadata=json.dumps(content_data.get("metadata", {}), indent=2),
+                content_preview=content_preview,
             )
             source_output = self._run_single_task("analyzer", source_task)
             source_assessment = parse_json_output(source_output)
@@ -148,23 +142,9 @@ Return as JSON with:
             emit("Source assessment complete. Generating summary...", 50)
 
             # Summarize
-            summarize_task = Task(
-                description=f"""Create a focused summary of this content:
-{full_text}
-
-Create:
-1. A 2-3 paragraph summary
-2. 5-7 key points (with timestamps if video)
-3. Main argument
-4. Key conclusions
-
-Return as JSON with:
-- summary: string
-- key_points: array of {{point, location}} (MAX 7)
-- main_argument: string
-- conclusions: array of strings""",
-                expected_output="JSON object with summary, key_points, main_argument, and conclusions",
+            summarize_task = create_summarize_task(
                 agent=self.agents["summarizer"],
+                full_text=full_text,
             )
             summarize_output = self._run_single_task("summarizer", summarize_task)
             summary = parse_json_output(summarize_output)
@@ -179,26 +159,9 @@ Return as JSON with:
         elif step_name == "claims":
             emit("Extracting and classifying claims...", 10)
             summary = input_data["summary_data"]
-            claims_task = Task(
-                description=f"""Extract 5-7 KEY claims from this summary:
-{json.dumps(summary, indent=2)}
-
-For each claim, classify using these STRICT criteria:
-- "factual": Claim is SUPPORTED by specific evidence in the content (data, citations, studies, statistics)
-- "unsupported": Claim is stated as fact but NO evidence is provided to back it up
-- "opinion": Expresses subjective view, preference, or value judgment
-- "prediction": Makes assertions about future events
-
-For each claim provide:
-- text: The claim stated concisely
-- type: One of "factual", "unsupported", "opinion", or "prediction"
-- evidence: What evidence supports/contradicts this claim, or "No supporting evidence in source"
-
-Return as JSON with:
-- claims: array of {{text, type, evidence}} (MAX 7)
-- main_topic: string""",
-                expected_output="JSON object with claims (including evidence) and main_topic",
+            claims_task = create_claims_task(
                 agent=self.agents["analyzer"],
+                summary=json.dumps(summary, indent=2),
             )
             claims_output = self._run_single_task("analyzer", claims_task)
             emit("Claims extraction complete", 100)
@@ -210,18 +173,11 @@ Return as JSON with:
             claims = input_data["claims_data"]
             content = input_data.get("full_text", "")[:3000]
 
-            controversy_task = Task(
-                description=f"""Analyze for controversial views and conspiracy patterns:
-Summary: {json.dumps(summary)}
-Claims: {json.dumps(claims)}
-Context: {content}
-
-Return as JSON with:
-- controversial_views: array of {{target, sentiment, claim_text, reasoning}}
-- conspiracy_indicators: array of {{pattern, severity, evidence, quote}}
-- overall_assessment: {{controversy_level, summary}}""",
-                expected_output="JSON object with controversial_views, conspiracy_indicators, and overall_assessment",
+            controversy_task = create_controversy_task(
                 agent=self.agents["controversy_detector"],
+                summary=json.dumps(summary),
+                claims=json.dumps(claims),
+                content=content,
             )
             controversy_output = self._run_single_task("controversy_detector", controversy_task)
             emit("Controversy analysis complete", 100)
@@ -232,19 +188,10 @@ Return as JSON with:
             claims = input_data["claims_data"]
             full_text = input_data["full_text"]
 
-            fallacy_task = Task(
-                description=f"""Analyze these claims for logical fallacies:
-Claims: {json.dumps(claims)}
-Text: {full_text}
-
-For each ACTUAL fallacy:
-- type, quote, location, explanation
-
-Return as JSON with:
-- fallacies: array of {{type, quote, location, explanation}}
-- overall_reasoning_quality: "strong", "moderate", or "weak" """,
-                expected_output="JSON object with fallacies array and overall_reasoning_quality",
+            fallacy_task = create_fallacies_task(
                 agent=self.agents["fallacy_detector"],
+                claims=json.dumps(claims),
+                full_text=full_text,
             )
             fallacy_output = self._run_single_task("fallacy_detector", fallacy_task)
             emit("Fallacy detection complete", 100)
@@ -255,19 +202,10 @@ Return as JSON with:
             claims = input_data["claims_data"]
             summary = input_data["summary_data"]
 
-            counter_task = Task(
-                description=f"""Find counterarguments to these claims:
-Claims: {json.dumps(claims)}
-Summary: {json.dumps(summary)}
-
-Use web_search tool to find real sources.
-
-Return as JSON with:
-- selected_claims: array
-- counterargument: string (~100 words)
-- sources: array of {{title, url}}""",
-                expected_output="JSON object with selected_claims, counterargument, and sources",
+            counter_task = create_counterargument_task(
                 agent=self.agents["counterargument_searcher"],
+                claims=json.dumps(claims),
+                summary=json.dumps(summary),
             )
             counter_output = self._run_single_task("counterargument_searcher", counter_task)
             emit("Counterargument search complete", 100)
