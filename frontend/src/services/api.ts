@@ -125,6 +125,37 @@ export interface ScrapeResultFull {
   vector_collection: string | null
 }
 
+export interface ContentAnalysis {
+  id: string
+  url: string
+  url_hash: string
+  source_type: string | null
+  title: string | null
+  source_credibility: string | null
+  source_credibility_reasoning: string | null
+  source_potential_biases: string[]
+  executive_summary: string | null
+  key_points: Array<{ point: string; location: string }>
+  main_argument: string | null
+  conclusions: string[]
+  status: string
+  error_message: string | null
+  created_at: string | null
+  updated_at: string | null
+  completed_at: string | null
+}
+
+export interface AnalysisHistoryItem {
+  id: string
+  url: string
+  source_type: string | null
+  title: string | null
+  executive_summary: string | null
+  status: string
+  created_at: string | null
+  completed_at: string | null
+}
+
 export const api = {
   // Health check
   async healthCheck() {
@@ -547,6 +578,70 @@ export const api = {
     }
 
     return { success: false, error: 'Stream ended unexpectedly' }
+  },
+
+  // Content Analysis Persistence
+  async getAnalysisByUrl(url: string): Promise<{
+    success: boolean
+    analysis: ContentAnalysis | null
+  }> {
+    const response = await axiosInstance.get('/analysis/by-url', { params: { url } })
+    return response.data
+  },
+
+  async getAnalysisHistory(params?: {
+    status?: string
+    limit?: number
+    offset?: number
+  }): Promise<{
+    success: boolean
+    analyses: AnalysisHistoryItem[]
+    total: number
+    limit: number
+    offset: number
+  }> {
+    const response = await axiosInstance.get('/analysis/history', { params })
+    return response.data
+  },
+
+  async getAnalysisContent(analysisId: string): Promise<{
+    success: boolean
+    analysis: ContentAnalysis
+  }> {
+    const response = await axiosInstance.get(`/analysis/content/${analysisId}`)
+    return response.data
+  },
+
+  async deleteAnalysis(analysisId: string): Promise<{
+    success: boolean
+    deleted: boolean
+  }> {
+    const response = await axiosInstance.delete(`/analysis/content/${analysisId}`)
+    return response.data
+  },
+
+  async saveAnalysis(data: {
+    url: string
+    source_type?: string
+    title?: string
+    source_assessment: {
+      credibility?: string
+      reasoning?: string
+      potential_biases?: string[]
+    }
+    summary: {
+      summary?: string
+      key_points?: Array<{ point: string; location: string }>
+      main_argument?: string
+      conclusions?: string[]
+    }
+  }): Promise<{
+    success: boolean
+    analysis_id?: string
+    analysis?: ContentAnalysis
+  }> {
+    const response = await axiosInstance.post('/analysis/save', data)
+    return response.data
   }
 }
 

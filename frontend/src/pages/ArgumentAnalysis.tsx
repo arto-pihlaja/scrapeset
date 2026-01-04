@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
     Loader2,
     FileText,
@@ -9,9 +9,11 @@ import {
     RotateCcw,
     ArrowRight,
     Calendar,
-    FileSearch
+    FileSearch,
+    History,
+    RefreshCw
 } from 'lucide-react'
-import api from '../services/api'
+import api, { ContentAnalysis } from '../services/api'
 import { VerifyButton } from '../components/ClaimVerification'
 
 interface AnalysisData {
@@ -35,6 +37,7 @@ interface SavedResultData {
 const ArgumentAnalysis = () => {
     const location = useLocation()
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
     const savedResultData = (location.state as { savedResultData?: SavedResultData })?.savedResultData
 
     const [loading, setLoading] = useState<string | null>(null)
@@ -44,9 +47,86 @@ const ArgumentAnalysis = () => {
     const [progressMessage, setProgressMessage] = useState<string>('')
     const [progressPercent, setProgressPercent] = useState<number>(0)
 
+    // Previous analysis detection
+    const [existingAnalysis, setExistingAnalysis] = useState<ContentAnalysis | null>(null)
+    const [checkingExisting, setCheckingExisting] = useState(false)
+    const [showExistingBanner, setShowExistingBanner] = useState(false)
+
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr)
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const formatRelativeDate = (dateStr: string | null) => {
+        if (!dateStr) return 'Unknown'
+        const date = new Date(dateStr)
+        const now = new Date()
+        const diffMs = now.getTime() - date.getTime()
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+        const diffDays = Math.floor(diffHours / 24)
+
+        if (diffHours < 1) return 'just now'
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+        if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+        return formatDate(dateStr)
+    }
+
+    // Check for existing analysis when URL is available
+    useEffect(() => {
+        const urlParam = searchParams.get('url')
+        const targetUrl = savedResultData?.url || urlParam
+
+        if (targetUrl) {
+            checkForExistingAnalysis(targetUrl)
+        }
+    }, [savedResultData?.url, searchParams])
+
+    const checkForExistingAnalysis = async (url: string) => {
+        setCheckingExisting(true)
+        try {
+            const result = await api.getAnalysisByUrl(url)
+            if (result.success && result.analysis && result.analysis.status === 'completed') {
+                setExistingAnalysis(result.analysis)
+                setShowExistingBanner(true)
+            } else {
+                setExistingAnalysis(null)
+                setShowExistingBanner(false)
+            }
+        } catch (err) {
+            console.error('Failed to check for existing analysis:', err)
+        } finally {
+            setCheckingExisting(false)
+        }
+    }
+
+    const loadPreviousAnalysis = () => {
+        if (!existingAnalysis) return
+
+        // Convert stored analysis to the format expected by the UI
+        const summaryData = {
+            summary: {
+                summary: existingAnalysis.executive_summary,
+                key_points: existingAnalysis.key_points || [],
+                main_argument: existingAnalysis.main_argument,
+                conclusions: existingAnalysis.conclusions || []
+            },
+            source_assessment: {
+                credibility: existingAnalysis.source_credibility,
+                reasoning: existingAnalysis.source_credibility_reasoning,
+                potential_biases: existingAnalysis.source_potential_biases || []
+            }
+        }
+
+        setAnalysisData({ summary: summaryData })
+        setActiveStep(1)  // Move to next step after summary
+        setShowExistingBanner(false)
+    }
+
+    const startFreshAnalysis = () => {
+        setShowExistingBanner(false)
+        setExistingAnalysis(null)
+        setAnalysisData({})
+        setActiveStep(0)
     }
 
     const steps = [
@@ -244,13 +324,53 @@ const ArgumentAnalysis = () => {
                 <p className="text-gray-500 mb-6">Analyze content for logical consistency, claims, and controversies using multi-agent orchestration.</p>
 
                 {savedResultData ? (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <h3 className="font-bold text-lg text-gray-900">{savedResultData.name}</h3>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
-                            <Calendar className="h-4 w-4" />
-                            <span>Saved {formatDate(savedResultData.saved_at)}</span>
+                    <div className="space-y-3">
+                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <h3 className="font-bold text-lg text-gray-900">{savedResultData.name}</h3>
+                            <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+                                <Calendar className="h-4 w-4" />
+                                <span>Saved {formatDate(savedResultData.saved_at)}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-blue-600">Click "Run Step" on Summary to start the analysis.</p>
                         </div>
-                        <p className="mt-2 text-xs text-blue-600">Click "Run Step" on Summary to start the analysis.</p>
+
+                        {/* Previous Analysis Banner */}
+                        {checkingExisting && (
+                            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
+                                <span className="text-sm text-gray-600">Checking for previous analysis...</span>
+                            </div>
+                        )}
+
+                        {showExistingBanner && existingAnalysis && (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <History className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-amber-900">Previous Analysis Found</h4>
+                                        <p className="text-sm text-amber-700 mt-1">
+                                            This content was analyzed {formatRelativeDate(existingAnalysis.completed_at || existingAnalysis.created_at)}
+                                        </p>
+                                        <div className="flex gap-2 mt-3">
+                                            <button
+                                                onClick={loadPreviousAnalysis}
+                                                className="px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 flex items-center gap-1"
+                                            >
+                                                <History className="h-3.5 w-3.5" />
+                                                Load Previous
+                                            </button>
+                                            <button
+                                                onClick={startFreshAnalysis}
+                                                className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg border border-amber-300 hover:bg-amber-50 flex items-center gap-1"
+                                            >
+                                                <RefreshCw className="h-3.5 w-3.5" />
+                                                Start Fresh
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">

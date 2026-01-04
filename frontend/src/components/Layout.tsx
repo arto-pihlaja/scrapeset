@@ -9,7 +9,8 @@ import {
   Settings,
   Menu,
   X,
-  ShieldAlert
+  ShieldAlert,
+  ClipboardList
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -26,6 +27,7 @@ const Layout = ({ children }: LayoutProps) => {
     { name: 'Scrape Web', href: '/scrape', icon: Globe },
     { name: 'Saved Results', href: '/saved-results', icon: Database },
     { name: 'Argument Analysis', href: '/analysis', icon: ShieldAlert },
+    { name: 'Analysis History', href: '/analysis-history', icon: ClipboardList },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
     { name: 'Conversations', href: '/conversations', icon: History },
     { name: 'Settings', href: '/settings', icon: Settings },

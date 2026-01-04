@@ -22,6 +22,7 @@ from src.llm import LLMClient
 from src.conversation import ConversationMemory
 from src.storage import ResultsStore
 from src.storage.verification import VerificationStore
+from src.storage.analysis import AnalysisStore
 from src.utils.logger import setup_logging, get_logger
 
 
@@ -766,7 +767,7 @@ async def analysis_step(request: AnalysisStepRequest):
     try:
         from src.analysis import AnalysisCrew
         crew = AnalysisCrew()
-        
+
         input_data = {}
         if request.step == "fetch":
             input_data["url"] = request.url
@@ -784,11 +785,51 @@ async def analysis_step(request: AnalysisStepRequest):
         elif request.step == "counterargument":
             input_data["claims_data"] = request.previous_data.get("claims")
             input_data["summary_data"] = request.previous_data.get("summary")
-            
+
         result = await asyncio.to_thread(crew.run_step, request.step, input_data)
 
         if "error" in result:
             return {"success": False, "error": result["error"]}
+
+        # Auto-save analysis results after summary step completes
+        if request.step == "summary" and request.previous_data:
+            try:
+                analysis_store = AnalysisStore()
+                url = request.previous_data.get("url", "")
+                source_type = request.previous_data.get("source_type")
+                title = request.previous_data.get("title")
+
+                # Extract source assessment and summary from result
+                source_assessment = {
+                    "credibility": result.get("source_assessment", {}).get("credibility"),
+                    "reasoning": result.get("source_assessment", {}).get("reasoning"),
+                    "potential_biases": result.get("source_assessment", {}).get("potential_biases", [])
+                }
+                summary = {
+                    "summary": result.get("summary"),
+                    "key_points": result.get("key_points", []),
+                    "main_argument": result.get("main_argument"),
+                    "conclusions": result.get("conclusions", [])
+                }
+
+                # Create or update analysis record and save results
+                analysis = analysis_store.create_or_update_analysis(
+                    url=url,
+                    source_type=source_type,
+                    title=title
+                )
+                analysis_store.save_analysis_results(
+                    analysis_id=analysis.id,
+                    source_assessment=source_assessment,
+                    summary=summary
+                )
+                logger.info(f"Auto-saved analysis {analysis.id} after summary step")
+
+                # Add analysis_id to result for frontend reference
+                result["analysis_id"] = analysis.id
+            except Exception as save_error:
+                logger.warning(f"Failed to auto-save analysis: {save_error}")
+                # Don't fail the request, just log the warning
 
         return {"success": True, "data": result}
 
@@ -866,6 +907,41 @@ async def analysis_step_stream(request: AnalysisStepRequest):
             if "error" in result:
                 yield f"data: {json.dumps({'type': 'error', 'error': result['error']})}\n\n"
             else:
+                # Auto-save analysis results after summary step completes
+                if request.step == "summary" and request.previous_data:
+                    try:
+                        analysis_store = AnalysisStore()
+                        url = request.previous_data.get("url", "")
+                        source_type = request.previous_data.get("source_type")
+                        title = request.previous_data.get("title")
+
+                        source_assessment = {
+                            "credibility": result.get("source_assessment", {}).get("credibility"),
+                            "reasoning": result.get("source_assessment", {}).get("reasoning"),
+                            "potential_biases": result.get("source_assessment", {}).get("potential_biases", [])
+                        }
+                        summary = {
+                            "summary": result.get("summary"),
+                            "key_points": result.get("key_points", []),
+                            "main_argument": result.get("main_argument"),
+                            "conclusions": result.get("conclusions", [])
+                        }
+
+                        analysis = analysis_store.create_or_update_analysis(
+                            url=url,
+                            source_type=source_type,
+                            title=title
+                        )
+                        analysis_store.save_analysis_results(
+                            analysis_id=analysis.id,
+                            source_assessment=source_assessment,
+                            summary=summary
+                        )
+                        result["analysis_id"] = analysis.id
+                        logger.info(f"Auto-saved analysis {analysis.id} after summary step (streaming)")
+                    except Exception as save_error:
+                        logger.warning(f"Failed to auto-save analysis: {save_error}")
+
                 yield f"data: {json.dumps({'type': 'complete', 'success': True, 'data': result})}\n\n"
         except Exception as e:
             logger.error(f"Analysis step {request.step} failed: {e}")
@@ -1089,6 +1165,149 @@ async def list_verifications(source_url: Optional[str] = None, limit: int = 50):
 
     except Exception as e:
         logger.error(f"Failed to list verifications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== Content Analysis Persistence Endpoints ==============
+
+
+class SaveAnalysisRequest(BaseModel):
+    """Request body for saving analysis results."""
+    url: str
+    source_type: Optional[str] = None
+    title: Optional[str] = None
+    source_assessment: Dict[str, Any]
+    summary: Dict[str, Any]
+
+
+@app.post("/api/analysis/save")
+async def save_analysis(request: SaveAnalysisRequest):
+    """Save analysis results for a URL.
+
+    Creates or updates an analysis record with the summary step results.
+    """
+    try:
+        analysis_store = AnalysisStore()
+
+        # Create or update the analysis record
+        analysis = analysis_store.create_or_update_analysis(
+            url=request.url,
+            source_type=request.source_type,
+            title=request.title
+        )
+
+        # Save the results
+        success = analysis_store.save_analysis_results(
+            analysis_id=analysis.id,
+            source_assessment=request.source_assessment,
+            summary=request.summary
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to save analysis results")
+
+        # Get the full analysis to return
+        saved_analysis = analysis_store.get_analysis(analysis.id)
+
+        return {
+            "success": True,
+            "analysis_id": analysis.id,
+            "analysis": saved_analysis.to_dict() if saved_analysis else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to save analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/by-url")
+async def get_analysis_by_url(url: str):
+    """Get existing analysis for a URL, if any."""
+    try:
+        analysis_store = AnalysisStore()
+        analysis = analysis_store.get_analysis_by_url(url)
+
+        return {
+            "success": True,
+            "analysis": analysis.to_dict() if analysis else None
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get analysis by URL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/history")
+async def get_analysis_history(
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """Get analysis history with optional filtering."""
+    try:
+        analysis_store = AnalysisStore()
+        analyses, total = analysis_store.list_analyses(
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+
+        return {
+            "success": True,
+            "analyses": analyses,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get analysis history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/content/{analysis_id}")
+async def get_analysis_content(analysis_id: str):
+    """Get full analysis content by ID."""
+    try:
+        analysis_store = AnalysisStore()
+        analysis = analysis_store.get_analysis(analysis_id)
+
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+
+        return {
+            "success": True,
+            "analysis": analysis.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/analysis/content/{analysis_id}")
+async def delete_analysis(analysis_id: str):
+    """Delete an analysis by ID."""
+    try:
+        analysis_store = AnalysisStore()
+        deleted = analysis_store.delete_analysis(analysis_id)
+
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+
+        return {
+            "success": True,
+            "deleted": True
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

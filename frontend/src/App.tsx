@@ -7,6 +7,7 @@ import Chat from './pages/Chat'
 import Conversations from './pages/Conversations'
 import Settings from './pages/Settings'
 import ArgumentAnalysis from './pages/ArgumentAnalysis'
+import AnalysisHistory from './pages/AnalysisHistory'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/scrape" element={<ScrapeWeb />} />
         <Route path="/analysis" element={<ArgumentAnalysis />} />
+        <Route path="/analysis-history" element={<AnalysisHistory />} />
         <Route path="/saved-results" element={<SavedResults />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/conversations" element={<Conversations />} />
