@@ -15,7 +15,7 @@ summarize:
     Return as JSON with:
     - summary: string (2-3 paragraphs)
     - main_argument: string
-    - key_claims: array of {text, location} (5-7 claims)
+    - key_claims: array of {{text, location}} (5-7 claims)
   expected_output: "JSON object with summary, main_argument, and key_claims"
   agent: summarizer
 
@@ -64,7 +64,7 @@ claims:
     - evidence: What evidence supports this claim in the source, or "No supporting evidence in source"
 
     Return as JSON with:
-    - claims: array of {text, type, evidence}
+    - claims: array of {{text, type, evidence}}
   expected_output: "JSON object with classified claims array"
   agent: analyzer
 
@@ -78,9 +78,9 @@ controversy:
     Key claims: {key_claims}
 
     Return as JSON with:
-    - controversial_views: array of {target, sentiment, claim_text, reasoning}
-    - conspiracy_indicators: array of {pattern, severity, evidence, quote}
-    - overall_assessment: {controversy_level, summary}
+    - controversial_views: array of {{target, sentiment, claim_text, reasoning}}
+    - conspiracy_indicators: array of {{pattern, severity, evidence, quote}}
+    - overall_assessment: {{controversy_level, summary}}
   expected_output: "JSON object with controversial_views, conspiracy_indicators, and overall_assessment"
   agent: controversy_detector
 
@@ -100,7 +100,7 @@ fallacies:
     - explanation why it is a fallacy
 
     Return as JSON with:
-    - fallacies: array of {type, quote, location, explanation}
+    - fallacies: array of {{type, quote, location, explanation}}
     - overall_reasoning_quality: "strong", "moderate", or "weak"
   expected_output: "JSON object with fallacies array and overall_reasoning_quality"
   agent: fallacy_detector
@@ -119,6 +119,6 @@ counterargument:
     Return as JSON with:
     - selected_claims: array (which claims you're addressing)
     - counterargument: string (~100 words)
-    - sources: array of {title, url}
+    - sources: array of {{title, url}}
   expected_output: "JSON object with selected_claims, counterargument, and sources"
   agent: counterargument_searcher

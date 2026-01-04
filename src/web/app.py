@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 import re
 import json
+import traceback
 
 from src.config import settings, ensure_directories
 from src.scraper import WebScraper, ScrapedContent
@@ -939,7 +940,7 @@ async def analysis_step_stream(request: AnalysisStepRequest):
 
                 yield f"data: {json.dumps({'type': 'complete', 'success': True, 'data': result})}\n\n"
         except Exception as e:
-            logger.error(f"Analysis step {request.step} failed: {e}")
+            logger.error(f"Analysis step {request.step} failed: {e}\n{traceback.format_exc()}")
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(

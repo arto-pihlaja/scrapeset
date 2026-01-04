@@ -4,6 +4,10 @@ import json
 import re
 from typing import Any
 
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def parse_json_output(output: str) -> dict[str, Any]:
     """Extract and parse JSON from agent output."""
@@ -18,7 +22,7 @@ def parse_json_output(output: str) -> dict[str, Any]:
                 return json.loads(json_match.group(1))
             except json.JSONDecodeError:
                 pass
-        
+
         # Try to find anything that looks like a JSON object
         json_match = re.search(r'(\{.*\})', output, re.DOTALL)
         if json_match:
@@ -26,7 +30,9 @@ def parse_json_output(output: str) -> dict[str, Any]:
                 return json.loads(json_match.group(1))
             except json.JSONDecodeError:
                 pass
-                
+
+    # Log the failure with raw output for debugging
+    logger.warning(f"Failed to parse JSON from output: {output[:500]}...")
     return {"error": "Could not parse JSON output", "raw": output}
 
 

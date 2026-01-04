@@ -6,6 +6,8 @@ from typing import Any, Callable
 
 from crewai import Crew, Process, Task
 
+from src.utils.logger import get_logger
+
 from .agents import create_all_agents
 from .tools import YouTubeMetadataTool, WebContentTool
 from .renderer import ReportRenderer, parse_json_output
@@ -17,6 +19,8 @@ from .tasks import (
     create_fallacies_task,
     create_counterargument_task,
 )
+
+logger = get_logger(__name__)
 
 
 def is_youtube_url(url: str) -> bool:
@@ -132,7 +136,30 @@ class AnalysisCrew:
                 full_text=full_text,
             )
             summarize_output = self._run_single_task("summarizer", summarize_task)
+            logger.debug(f"Raw summarizer output: {summarize_output[:500]}...")
             result = parse_json_output(summarize_output)
+
+            # Check for parse errors
+            if "error" in result:
+                logger.error(f"Failed to parse summary JSON: {result.get('raw', '')[:500]}")
+
+            # Validate key_claims structure
+            key_claims = result.get("key_claims", [])
+            if not isinstance(key_claims, list):
+                logger.warning(f"key_claims is not a list: {type(key_claims)} - {key_claims}")
+                result["key_claims"] = []
+            else:
+                # Ensure each claim has required fields
+                validated_claims = []
+                for i, claim in enumerate(key_claims):
+                    if isinstance(claim, dict) and "text" in claim:
+                        validated_claims.append({
+                            "text": claim.get("text", ""),
+                            "location": claim.get("location", "")
+                        })
+                    else:
+                        logger.warning(f"Invalid claim at index {i}: {claim}")
+                result["key_claims"] = validated_claims
 
             emit("Summary complete", 100)
 
