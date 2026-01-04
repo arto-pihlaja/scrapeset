@@ -16,7 +16,7 @@ analyzer:
 fallacy_detector:
   role: "Logical Reasoning Analyst"
   goal: >
-    Identify logical fallacies in arguments and claims, if any. Select the 1 to 5 most striking fallacies.
+    Identify logical fallacies in arguments and claims, if any. Select 0 to 5 most striking fallacies.
     For selected fallacies, provide the exact quote and explain why it's a fallacy.
   backstory: >
     You are a logic and argumentation expert with extensive training in formal and informal

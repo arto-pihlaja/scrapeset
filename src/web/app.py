@@ -773,18 +773,22 @@ async def analysis_step(request: AnalysisStepRequest):
             input_data["url"] = request.url
         elif request.step == "summary":
             input_data["content_data"] = request.previous_data
+        elif request.step == "source_assessment":
+            input_data["content_data"] = request.previous_data
         elif request.step == "claims":
-            input_data["summary_data"] = request.previous_data
-        elif request.step == "controversy":
-            input_data["summary_data"] = request.previous_data.get("summary")
-            input_data["claims_data"] = request.previous_data.get("claims")
+            # Claims step uses key_claims from summary_data
+            input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
             input_data["full_text"] = request.previous_data.get("full_text", "")
+        elif request.step == "controversy":
+            # Controversy step uses summary_data (summary, main_argument, key_claims)
+            input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
         elif request.step == "fallacies":
-            input_data["claims_data"] = request.previous_data.get("claims")
+            # Fallacies step uses key_claims from summary_data
+            input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
             input_data["full_text"] = request.previous_data.get("full_text", "")
         elif request.step == "counterargument":
-            input_data["claims_data"] = request.previous_data.get("claims")
-            input_data["summary_data"] = request.previous_data.get("summary")
+            # Counterargument step uses summary_data (summary, main_argument, key_claims)
+            input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
 
         result = await asyncio.to_thread(crew.run_step, request.step, input_data)
 
@@ -799,17 +803,11 @@ async def analysis_step(request: AnalysisStepRequest):
                 source_type = request.previous_data.get("source_type")
                 title = request.previous_data.get("title")
 
-                # Extract source assessment and summary from result
-                source_assessment = {
-                    "credibility": result.get("source_assessment", {}).get("credibility"),
-                    "reasoning": result.get("source_assessment", {}).get("reasoning"),
-                    "potential_biases": result.get("source_assessment", {}).get("potential_biases", [])
-                }
+                # Summary result now contains: summary, main_argument, key_claims
                 summary = {
                     "summary": result.get("summary"),
-                    "key_points": result.get("key_points", []),
                     "main_argument": result.get("main_argument"),
-                    "conclusions": result.get("conclusions", [])
+                    "key_claims": result.get("key_claims", [])
                 }
 
                 # Create or update analysis record and save results
@@ -820,7 +818,6 @@ async def analysis_step(request: AnalysisStepRequest):
                 )
                 analysis_store.save_analysis_results(
                     analysis_id=analysis.id,
-                    source_assessment=source_assessment,
                     summary=summary
                 )
                 logger.info(f"Auto-saved analysis {analysis.id} after summary step")
@@ -867,18 +864,22 @@ async def analysis_step_stream(request: AnalysisStepRequest):
                 input_data["url"] = request.url
             elif request.step == "summary":
                 input_data["content_data"] = request.previous_data
+            elif request.step == "source_assessment":
+                input_data["content_data"] = request.previous_data
             elif request.step == "claims":
-                input_data["summary_data"] = request.previous_data
-            elif request.step == "controversy":
-                input_data["summary_data"] = request.previous_data.get("summary")
-                input_data["claims_data"] = request.previous_data.get("claims")
+                # Claims step uses key_claims from summary_data
+                input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
                 input_data["full_text"] = request.previous_data.get("full_text", "")
+            elif request.step == "controversy":
+                # Controversy step uses summary_data (summary, main_argument, key_claims)
+                input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
             elif request.step == "fallacies":
-                input_data["claims_data"] = request.previous_data.get("claims")
+                # Fallacies step uses key_claims from summary_data
+                input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
                 input_data["full_text"] = request.previous_data.get("full_text", "")
             elif request.step == "counterargument":
-                input_data["claims_data"] = request.previous_data.get("claims")
-                input_data["summary_data"] = request.previous_data.get("summary")
+                # Counterargument step uses summary_data (summary, main_argument, key_claims)
+                input_data["summary_data"] = request.previous_data.get("summary_data", request.previous_data)
 
             return await asyncio.to_thread(
                 crew.run_step, request.step, input_data, progress_callback
@@ -915,16 +916,11 @@ async def analysis_step_stream(request: AnalysisStepRequest):
                         source_type = request.previous_data.get("source_type")
                         title = request.previous_data.get("title")
 
-                        source_assessment = {
-                            "credibility": result.get("source_assessment", {}).get("credibility"),
-                            "reasoning": result.get("source_assessment", {}).get("reasoning"),
-                            "potential_biases": result.get("source_assessment", {}).get("potential_biases", [])
-                        }
+                        # Summary result now contains: summary, main_argument, key_claims
                         summary = {
                             "summary": result.get("summary"),
-                            "key_points": result.get("key_points", []),
                             "main_argument": result.get("main_argument"),
-                            "conclusions": result.get("conclusions", [])
+                            "key_claims": result.get("key_claims", [])
                         }
 
                         analysis = analysis_store.create_or_update_analysis(
@@ -934,7 +930,6 @@ async def analysis_step_stream(request: AnalysisStepRequest):
                         )
                         analysis_store.save_analysis_results(
                             analysis_id=analysis.id,
-                            source_assessment=source_assessment,
                             summary=summary
                         )
                         result["analysis_id"] = analysis.id
@@ -1199,8 +1194,8 @@ async def save_analysis(request: SaveAnalysisRequest):
         # Save the results
         success = analysis_store.save_analysis_results(
             analysis_id=analysis.id,
-            source_assessment=request.source_assessment,
-            summary=request.summary
+            summary=request.summary,
+            source_assessment=request.source_assessment
         )
 
         if not success:

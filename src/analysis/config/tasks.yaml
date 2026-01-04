@@ -1,3 +1,25 @@
+# Summary task - neutral content extraction, no analysis or judgment
+# Results from this task are persisted and used by all analysis tasks
+summarize:
+  description: |
+    Extract the key messages from this content without judgment or analysis:
+    {full_text}
+
+    Extract:
+    1. A 2-3 paragraph summary that accurately represents the content
+    2. The main argument or thesis being presented
+    3. 5-7 key claims made in the content (with timestamps/locations if available)
+
+    Be objective - represent what the content says, not whether it's correct or credible.
+
+    Return as JSON with:
+    - summary: string (2-3 paragraphs)
+    - main_argument: string
+    - key_claims: array of {text, location} (5-7 claims)
+  expected_output: "JSON object with summary, main_argument, and key_claims"
+  agent: summarizer
+
+# Source assessment - evaluates credibility (optional, can run after summary)
 source_assessment:
   description: |
     Assess the credibility of this source:
@@ -21,29 +43,14 @@ source_assessment:
   expected_output: "JSON object with credibility, reasoning, and potential_biases"
   agent: analyzer
 
-summarize:
-  description: |
-    Create a focused summary of this content:
-    {full_text}
-
-    Create:
-    1. A 2-3 paragraph summary
-    2. 5-7 key points (with timestamps if video)
-    3. Main argument
-    4. Key conclusions
-
-    Return as JSON with:
-    - summary: string
-    - key_points: array of {point, location} (MAX 7)
-    - main_argument: string
-    - conclusions: array of strings
-  expected_output: "JSON object with summary, key_points, main_argument, and conclusions"
-  agent: summarizer
-
+# Claims classification - analyzes key_claims from summary
 claims:
   description: |
-    Extract 5-7 KEY claims from this summary:
-    {summary}
+    Classify these key claims extracted from the content:
+    {key_claims}
+
+    Original text for reference:
+    {full_text}
 
     For each claim, classify using these STRICT criteria:
     - "factual": Claim is SUPPORTED by specific evidence in the content (data, citations, studies, statistics)
@@ -52,22 +59,23 @@ claims:
     - "prediction": Makes assertions about future events
 
     For each claim provide:
-    - text: The claim stated concisely
+    - text: The original claim text
     - type: One of "factual", "unsupported", "opinion", or "prediction"
-    - evidence: What evidence supports/contradicts this claim, or "No supporting evidence in source"
+    - evidence: What evidence supports this claim in the source, or "No supporting evidence in source"
 
     Return as JSON with:
-    - claims: array of {text, type, evidence} (MAX 7)
-    - main_topic: string
-  expected_output: "JSON object with claims (including evidence) and main_topic"
+    - claims: array of {text, type, evidence}
+  expected_output: "JSON object with classified claims array"
   agent: analyzer
 
+# Controversy detection - analyzes key_claims from summary
 controversy:
   description: |
-    Analyze for controversial views and conspiracy patterns:
+    Analyze these key claims for controversial views and conspiracy patterns:
+
     Summary: {summary}
-    Claims: {claims}
-    Context: {content}
+    Main argument: {main_argument}
+    Key claims: {key_claims}
 
     Return as JSON with:
     - controversial_views: array of {target, sentiment, claim_text, reasoning}
@@ -76,14 +84,20 @@ controversy:
   expected_output: "JSON object with controversial_views, conspiracy_indicators, and overall_assessment"
   agent: controversy_detector
 
+# Fallacy detection - analyzes key_claims from summary
 fallacies:
   description: |
-    Analyze these claims for logical fallacies:
-    Claims: {claims}
-    Text: {full_text}
+    Analyze the text to see if any logical fallacies are used to support these claims:
 
-    For each ACTUAL fallacy:
-    - type, quote, location, explanation
+    Key claims: {key_claims}
+
+    Full text: {full_text}
+
+    If and ONLY IF a claim is supported with a logical fallacy, get:
+    - type of fallacy
+    - quote presenting the claim and the fallacy
+    - location in text
+    - explanation why it is a fallacy
 
     Return as JSON with:
     - fallacies: array of {type, quote, location, explanation}
@@ -91,16 +105,19 @@ fallacies:
   expected_output: "JSON object with fallacies array and overall_reasoning_quality"
   agent: fallacy_detector
 
+# Counterargument search - uses key_claims from summary
 counterargument:
   description: |
-    Find counterarguments to these claims:
-    Claims: {claims}
-    Summary: {summary}
+    Craft a professional, fact-based counterargument to these key claims:
 
-    Use web_search tool to find real sources.
+    Summary: {summary}
+    Main argument: {main_argument}
+    Key claims: {key_claims}
+
+    Use web_search tool to find real and trustworthy sources.
 
     Return as JSON with:
-    - selected_claims: array
+    - selected_claims: array (which claims you're addressing)
     - counterargument: string (~100 words)
     - sources: array of {title, url}
   expected_output: "JSON object with selected_claims, counterargument, and sources"

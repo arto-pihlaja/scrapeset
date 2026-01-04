@@ -197,28 +197,31 @@ class AnalysisStore:
     def save_analysis_results(
         self,
         analysis_id: str,
-        source_assessment: Dict[str, Any],
         summary: Dict[str, Any],
+        source_assessment: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Save the analysis results after summary step completes.
 
         Args:
             analysis_id: The analysis record ID
-            source_assessment: Dict with credibility, reasoning, potential_biases
-            summary: Dict with summary, key_points, main_argument, conclusions
+            summary: Dict with summary, main_argument, key_claims
+            source_assessment: Optional dict with credibility, reasoning, potential_biases
         """
         now = datetime.now()
 
-        # Extract fields from source_assessment
-        credibility = source_assessment.get("credibility")
-        reasoning = source_assessment.get("reasoning")
-        biases = source_assessment.get("potential_biases", [])
+        # Extract fields from source_assessment (optional)
+        credibility = None
+        reasoning = None
+        biases: list = []
+        if source_assessment:
+            credibility = source_assessment.get("credibility")
+            reasoning = source_assessment.get("reasoning")
+            biases = source_assessment.get("potential_biases", [])
 
-        # Extract fields from summary
+        # Extract fields from summary (now includes key_claims instead of key_points/conclusions)
         executive_summary = summary.get("summary")
-        key_points = summary.get("key_points", [])
+        key_claims = summary.get("key_claims", [])
         main_argument = summary.get("main_argument")
-        conclusions = summary.get("conclusions", [])
 
         with self._get_connection() as conn:
             cursor = conn.execute(
@@ -230,7 +233,6 @@ class AnalysisStore:
                     executive_summary = ?,
                     key_points = ?,
                     main_argument = ?,
-                    conclusions = ?,
                     status = 'completed',
                     updated_at = ?,
                     completed_at = ?
@@ -241,9 +243,8 @@ class AnalysisStore:
                     reasoning,
                     json.dumps(biases),
                     executive_summary,
-                    json.dumps(key_points),
+                    json.dumps(key_claims),  # Store key_claims in key_points column
                     main_argument,
-                    json.dumps(conclusions),
                     now.isoformat(),
                     now.isoformat(),
                     analysis_id
