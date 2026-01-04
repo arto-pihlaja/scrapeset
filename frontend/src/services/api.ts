@@ -354,6 +354,199 @@ export const api = {
   async deleteVectorDB(resultId: number): Promise<{ success: boolean; message?: string; error?: string }> {
     const response = await axiosInstance.delete(`/results/${resultId}/vector-db`)
     return response.data
+  },
+
+  // Claim Verification
+  async verifyClaim(data: {
+    claim_text: string
+    source_url: string
+    claim_id?: string
+  }): Promise<{
+    success: boolean
+    id?: string
+    status?: string
+    claim_text?: string
+    created_at?: string
+    error_message?: string
+  }> {
+    const response = await axiosInstance.post('/analysis/verify-claim', data)
+    return response.data
+  },
+
+  async getVerification(verificationId: string): Promise<{
+    success: boolean
+    verification?: {
+      id: string
+      claim_text: string
+      source_url: string
+      status: string
+      claim_id?: string
+      evidence_for: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      evidence_against: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      conclusion?: string
+      conclusion_type?: string
+      error_message?: string
+      created_at?: string
+      completed_at?: string
+    }
+  }> {
+    const response = await axiosInstance.get(`/analysis/verification/${verificationId}`)
+    return response.data
+  },
+
+  async getVerifications(sourceUrl?: string, limit: number = 50): Promise<{
+    success: boolean
+    verifications: Array<{
+      id: string
+      claim_text: string
+      source_url: string
+      status: string
+      conclusion_type?: string
+      created_at: string
+      completed_at?: string
+    }>
+  }> {
+    const params: any = { limit }
+    if (sourceUrl) params.source_url = sourceUrl
+    const response = await axiosInstance.get('/analysis/verifications', { params })
+    return response.data
+  },
+
+  async getVerificationByClaim(data: {
+    claim_id?: string
+    claim_text?: string
+    source_url?: string
+  }): Promise<{
+    success: boolean
+    verification?: {
+      id: string
+      claim_text: string
+      source_url: string
+      status: string
+      claim_id?: string
+      evidence_for: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      evidence_against: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      conclusion?: string
+      conclusion_type?: string
+      error_message?: string
+      created_at?: string
+      completed_at?: string
+    }
+  }> {
+    const params: any = {}
+    if (data.claim_id) params.claim_id = data.claim_id
+    if (data.claim_text) params.claim_text = data.claim_text
+    if (data.source_url) params.source_url = data.source_url
+    const response = await axiosInstance.get('/analysis/verification/by-claim', { params })
+    return response.data
+  },
+
+  // Claim Verification with SSE streaming for progress updates
+  async verifyClaimWithProgress(
+    data: {
+      claim_text: string
+      source_url: string
+      claim_id?: string
+    },
+    onProgress: (message: string, step: string, progress: number) => void
+  ): Promise<{
+    success: boolean
+    data?: {
+      id: string
+      claim_text: string
+      source_url: string
+      status: string
+      evidence_for: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      evidence_against: Array<{
+        source_url: string
+        source_title: string
+        snippet: string
+        credibility_score?: number
+        credibility_reasoning?: string
+      }>
+      conclusion?: string
+      conclusion_type?: string
+      created_at?: string
+      completed_at?: string
+    }
+    error?: string
+  }> {
+    const response = await fetch(`${API_BASE_URL}/analysis/verify-claim/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+
+    if (!response.ok) {
+      return { success: false, error: `HTTP error: ${response.status}` }
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      return { success: false, error: 'No response body' }
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''  // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6))
+            if (event.type === 'progress') {
+              onProgress(event.message, event.step, event.progress)
+            } else if (event.type === 'complete') {
+              return { success: true, data: event.data }
+            } else if (event.type === 'error') {
+              return { success: false, error: event.error }
+            }
+            // Ignore heartbeat events
+          } catch (e) {
+            console.warn('Failed to parse SSE event:', line)
+          }
+        }
+      }
+    }
+
+    return { success: false, error: 'Stream ended unexpectedly' }
   }
 }
 

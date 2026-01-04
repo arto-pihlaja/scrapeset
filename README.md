@@ -46,34 +46,6 @@ ANTHROPIC_API_KEY=your_anthropic_key
 OPENROUTER_API_KEY=your_openrouter_key
 ```
 
-### Basic Usage
-
-1. **Scrape a website**:
-```bash
-uv run python main.py scrape https://example.com
-```
-The tool will extract text elements and let you choose which ones to include.
-
-2. **Ask questions about the content**:
-```bash
-uv run python main.py query "What is the main topic of this article?"
-```
-
-3. **Start an interactive chat session**:
-```bash
-uv run python main.py chat
-```
-
-4. **Check your collection status**:
-```bash
-uv run python main.py status
-```
-
-5. **List all collections**:
-```bash
-uv run python main.py collections
-```
-
 ## 🌐 Web Interface
 
 ScrapeSET now includes a modern web interface built with React and FastAPI!
@@ -118,18 +90,16 @@ The web interface provides all CLI functionality in an intuitive, visual format 
 - Responsive design for all devices
 - Conversation memory with session management
 
-## 📖 CLI Commands
 
-### `scrape`
-Scrape a website and add content to your vector store.
 
+### Basic CLI Usage
+
+1. **Scrape a website**:
 ```bash
-python main.py scrape URL [OPTIONS]
+uv run python main.py scrape https://example.com
 ```
+The tool will extract text elements 
 
-**Options:**
-- `--interactive/--auto`: Enable/disable interactive text selection (default: interactive)
-- `--collection TEXT`: Specify collection name for vector store
 
 **Example:**
 ```bash
@@ -142,6 +112,11 @@ uv run python main.py scrape https://python.org --auto
 # Use custom collection
 uv run python main.py scrape https://python.org --collection python_docs
 ```
+
+**Options:**
+- `--interactive/--auto`: Enable/disable interactive text selection (default: interactive)
+- `--collection TEXT`: Specify collection name for vector store
+
 
 ### `query`
 Ask a question using RAG (Retrieval-Augmented Generation).

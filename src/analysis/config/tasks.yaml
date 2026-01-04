@@ -27,17 +27,15 @@ analyze_content:
     {content}
 
     Identify:
-    1. All significant claims made (factual, opinion, or prediction)
-    2. Key entities mentioned (people, organizations, concepts)
-    3. The main topic and central argument
-    4. Source credibility assessment with reasoning
-    5. Potential biases in the content
+    1. All significant claims made 
+    2. The main topic and central argument
+    3. Source credibility assessment with reasoning
+    4. Potential biases in the content
 
     For each claim, note its location (paragraph number or timestamp).
   expected_output: >
     A JSON object with:
-    - claims: array of {id, text, location, type}
-    - key_entities: array of strings
+    - claims: array of {id, text, location}
     - main_topic: string
     - source_assessment: {credibility: high/medium/low/unknown, reasoning: string, potential_biases: array}
   agent: analyzer
@@ -57,16 +55,12 @@ detect_fallacies:
     2. Quote the exact text containing the fallacy
     3. Note the location (paragraph/timestamp)
     4. Explain why it's a fallacy
-    5. Suggest a search query to find counterarguments
-
-    Also provide suggested searches for finding opposing viewpoints on the main contested claims.
 
     If no fallacies are found, return an empty fallacies array.
   expected_output: >
     A JSON object with:
     - fallacies: array of {type, claim_id, quote, location, explanation, counterargument_search}
     - overall_reasoning_quality: "strong", "moderate", or "weak"
-    - counterargument_sources: array of {topic, suggested_search}
   agent: fallacy_detector
 
 summarize_content:

@@ -47,20 +47,6 @@ def get_llm() -> LLM:
     )
 
 
-def create_fetcher_agent() -> Agent:
-    """Create the content fetcher agent with web and YouTube tools."""
-    config = load_agent_config()["fetcher"]
-    return Agent(
-        role=config["role"],
-        goal=config["goal"],
-        backstory=config["backstory"],
-        tools=[YouTubeMetadataTool(), WebContentTool()],
-        llm=get_llm(),
-        verbose=config.get("verbose", True),
-        allow_delegation=config.get("allow_delegation", False),
-    )
-
-
 def create_analyzer_agent() -> Agent:
     """Create the content analyzer agent."""
     config = load_agent_config()["analyzer"]
@@ -134,7 +120,6 @@ def create_controversy_detector_agent() -> Agent:
 def create_all_agents() -> dict[str, Agent]:
     """Create all agents and return them in a dictionary."""
     return {
-        "fetcher": create_fetcher_agent(),
         "analyzer": create_analyzer_agent(),
         "fallacy_detector": create_fallacy_detector_agent(),
         "summarizer": create_summarizer_agent(),

@@ -13,7 +13,10 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = config("ANTHROPIC_API_KEY", default=None)
     openrouter_api_key: Optional[str] = config("OPENROUTER_API_KEY", default=None)
     deepseek_api_key: Optional[str] = config("DEEPSEEK_API_KEY", default=None)
-    
+
+    # Web Search (Claim Verification)
+    tavily_api_key: Optional[str] = config("TAVILY_API_KEY", default=None)
+
     # Generic LLM support (e.g. DeepSeek, LocalAI)
     llm_api_base: Optional[str] = config("LLM_API_BASE", default=None)
     llm_api_key: Optional[str] = config("LLM_API_KEY", default=None)

@@ -12,6 +12,7 @@ import {
     FileSearch
 } from 'lucide-react'
 import api from '../services/api'
+import { VerifyButton } from '../components/ClaimVerification'
 
 interface AnalysisData {
     summary?: any
@@ -135,26 +136,39 @@ const ArgumentAnalysis = () => {
                 )
             case 'claims':
                 return (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                         <h3 className="font-bold">Significant Claims</h3>
                         {data.claims.map((c: any, i: number) => (
                             <div key={i} className="p-3 bg-white rounded border border-gray-100 shadow-sm">
-                                <div className="flex items-start gap-2">
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0 ${
-                                        c.type === 'factual' ? 'bg-blue-100 text-blue-700' :
-                                        c.type === 'unsupported' ? 'bg-yellow-100 text-yellow-700' :
-                                        c.type === 'opinion' ? 'bg-purple-100 text-purple-700' :
-                                        'bg-orange-100 text-orange-700'
-                                    }`}>
-                                        {c.type}
-                                    </span>
-                                    <span className="text-sm">{c.text}</span>
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex-shrink-0 ${
+                                            c.type === 'factual' ? 'bg-blue-100 text-blue-700' :
+                                            c.type === 'unsupported' ? 'bg-yellow-100 text-yellow-700' :
+                                            c.type === 'opinion' ? 'bg-purple-100 text-purple-700' :
+                                            'bg-orange-100 text-orange-700'
+                                        }`}>
+                                            {c.type}
+                                        </span>
+                                        <span className="text-sm">{c.text}</span>
+                                    </div>
                                 </div>
                                 {c.evidence && (
                                     <div className="mt-2 text-xs text-gray-500 italic pl-2 border-l-2 border-gray-200">
                                         <span className="font-medium text-gray-600">Evidence:</span> {c.evidence}
                                     </div>
                                 )}
+                                {/* Verification button and results - full width for results expansion */}
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <VerifyButton
+                                        claimText={c.text}
+                                        claimId={`claim-${i}`}
+                                        sourceUrl={savedResultData?.url || ''}
+                                        onVerificationStarted={(id) => console.log('Verification started:', id)}
+                                        onVerificationComplete={(result) => console.log('Verification complete:', result)}
+                                        onError={(err) => console.error('Verification error:', err)}
+                                    />
+                                </div>
                             </div>
                         ))}
                     </div>

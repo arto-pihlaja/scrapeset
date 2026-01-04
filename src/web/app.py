@@ -21,6 +21,7 @@ from src.vector import VectorStore
 from src.llm import LLMClient
 from src.conversation import ConversationMemory
 from src.storage import ResultsStore
+from src.storage.verification import VerificationStore
 from src.utils.logger import setup_logging, get_logger
 
 
@@ -154,6 +155,22 @@ class SaveResultResponse(BaseModel):
 
 class CreateVectorDBRequest(BaseModel):
     collection_name: Optional[str] = None
+
+
+# Claim Verification models
+class VerifyClaimRequest(BaseModel):
+    claim_text: str
+    source_url: str
+    claim_id: Optional[str] = None
+
+
+class VerifyClaimResponse(BaseModel):
+    success: bool
+    id: Optional[str] = None
+    status: Optional[str] = None
+    claim_text: Optional[str] = None
+    created_at: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 # API Routes
@@ -863,6 +880,216 @@ async def analysis_step_stream(request: AnalysisStepRequest):
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         }
     )
+
+
+# Claim Verification endpoints
+
+@app.post("/api/analysis/verify-claim", response_model=VerifyClaimResponse)
+async def verify_claim(request: VerifyClaimRequest):
+    """Trigger claim verification.
+
+    Creates a pending verification record and returns immediately.
+    Use /api/analysis/verify-claim/stream to run the full verification pipeline.
+    """
+    try:
+        verification_store = VerificationStore()
+
+        # Create the verification record
+        verification = verification_store.create_verification(
+            claim_text=request.claim_text,
+            source_url=request.source_url,
+            claim_id=request.claim_id
+        )
+
+        logger.info(f"Created verification {verification.id} for claim: {request.claim_text[:50]}...")
+
+        return VerifyClaimResponse(
+            success=True,
+            id=verification.id,
+            status=verification.status,
+            claim_text=verification.claim_text,
+            created_at=verification.created_at.isoformat() if verification.created_at else None
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create verification: {e}")
+        return VerifyClaimResponse(
+            success=False,
+            error_message=str(e)
+        )
+
+
+@app.post("/api/analysis/verify-claim/stream")
+async def verify_claim_stream(request: VerifyClaimRequest):
+    """Run claim verification with SSE streaming for progress updates.
+
+    Creates a verification record and runs the full 4-agent pipeline:
+    WebSearchAgent → EvidenceAnalyzerAgent → CredibilityAssessorAgent → ConclusionSynthesizerAgent
+
+    Returns Server-Sent Events with progress messages during execution,
+    followed by the final result.
+    """
+    from src.analysis.verification_crew import VerificationCrew
+
+    async def event_generator():
+        queue: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+
+        def progress_callback(message: str, step: str, progress: int):
+            """Callback invoked by VerificationCrew to report progress."""
+            asyncio.run_coroutine_threadsafe(
+                queue.put({
+                    "type": "progress",
+                    "message": message,
+                    "step": step,
+                    "progress": progress
+                }),
+                loop
+            )
+
+        async def run_verification():
+            """Run the verification in a thread pool with progress callback."""
+            verification_store = VerificationStore()
+
+            # Create the verification record
+            verification = verification_store.create_verification(
+                claim_text=request.claim_text,
+                source_url=request.source_url,
+                claim_id=request.claim_id
+            )
+
+            # Run the verification pipeline
+            crew = VerificationCrew(store=verification_store)
+            return await asyncio.to_thread(
+                crew.run,
+                verification.id,
+                request.claim_text,
+                progress_callback
+            )
+
+        # Start the verification task
+        task = asyncio.create_task(run_verification())
+
+        # Stream progress events while task is running
+        while not task.done():
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=2.0)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+
+        # Drain any remaining progress messages
+        while not queue.empty():
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+
+        # Get the final result
+        try:
+            result = await task
+            if result.get("success"):
+                yield f"data: {json.dumps({'type': 'complete', 'success': True, 'data': result})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'error', 'error': result.get('error', 'Unknown error')})}\n\n"
+        except Exception as e:
+            logger.error(f"Verification failed: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+
+@app.get("/api/analysis/verification/by-claim")
+async def get_verification_by_claim(
+    claim_id: Optional[str] = None,
+    claim_text: Optional[str] = None,
+    source_url: Optional[str] = None
+):
+    """Get the most recent verification for a claim.
+
+    Query by either:
+    - claim_id: The unique claim identifier
+    - claim_text + source_url: The exact claim text and source URL
+    """
+    try:
+        if not claim_id and not (claim_text and source_url):
+            raise HTTPException(
+                status_code=400,
+                detail="Must provide either claim_id or both claim_text and source_url"
+            )
+
+        verification_store = VerificationStore()
+        verification = verification_store.get_verification_by_claim(
+            claim_id=claim_id,
+            claim_text=claim_text,
+            source_url=source_url
+        )
+
+        if not verification:
+            return {
+                "success": True,
+                "verification": None
+            }
+
+        return {
+            "success": True,
+            "verification": verification.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get verification by claim: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/verification/{verification_id}")
+async def get_verification(verification_id: str):
+    """Get a verification result by ID."""
+    try:
+        verification_store = VerificationStore()
+        verification = verification_store.get_verification(verification_id)
+
+        if not verification:
+            raise HTTPException(status_code=404, detail="Verification not found")
+
+        return {
+            "success": True,
+            "verification": verification.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get verification: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/verifications")
+async def list_verifications(source_url: Optional[str] = None, limit: int = 50):
+    """List verifications, optionally filtered by source URL."""
+    try:
+        verification_store = VerificationStore()
+        verifications = verification_store.list_verifications(
+            source_url=source_url,
+            limit=limit
+        )
+
+        return {
+            "success": True,
+            "verifications": verifications
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to list verifications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # WebSocket endpoint for real-time updates

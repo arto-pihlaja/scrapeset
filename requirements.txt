@@ -49,3 +49,6 @@ yt-dlp>=2025.12.8
 youtube-transcript-api>=1.2.2
 python-multipart>=0.0.20
 openai>=1.58.1,<2.0.0
+
+# Web Search (Claim Verification)
+tavily-python>=0.3.0
