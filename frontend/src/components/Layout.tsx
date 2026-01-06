@@ -6,7 +6,6 @@ import {
   MessageCircle,
   Database,
   History,
-  Settings,
   Menu,
   X,
   ShieldAlert,
@@ -30,7 +29,6 @@ const Layout = ({ children }: LayoutProps) => {
     { name: 'Analysis History', href: '/analysis-history', icon: ClipboardList },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
     { name: 'Chat history', href: '/conversations', icon: History },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
   return (
