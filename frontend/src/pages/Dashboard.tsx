@@ -6,50 +6,33 @@ import {
   Database,
   Activity,
   FileText,
-  Clock,
-  TrendingUp,
-  Users
+  TrendingUp
 } from 'lucide-react'
 import { api } from '../services/api'
 
-interface Collection {
-  name: string
-  id: string
-  document_count: number
-  metadata?: any
-}
-
 interface DashboardStats {
-  totalCollections: number
-  totalDocuments: number
-  recentActivity: any[]
+  totalVectorDBs: number
+  totalSavedResults: number
 }
 
 const Dashboard = () => {
-  const [collections, setCollections] = useState<Collection[]>([])
   const [stats, setStats] = useState<DashboardStats>({
-    totalCollections: 0,
-    totalDocuments: 0,
-    recentActivity: []
+    totalVectorDBs: 0,
+    totalSavedResults: 0
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const collectionsResponse = await api.getCollections()
-        if (collectionsResponse.success) {
-          setCollections(collectionsResponse.collections)
-          const totalDocs = collectionsResponse.collections.reduce(
-            (sum: number, col: Collection) => sum + col.document_count,
-            0
-          )
-          setStats({
-            totalCollections: collectionsResponse.collections.length,
-            totalDocuments: totalDocs,
-            recentActivity: []
-          })
-        }
+        const [collectionsResponse, resultsResponse] = await Promise.all([
+          api.getCollections(),
+          api.getResults()
+        ])
+        setStats({
+          totalVectorDBs: collectionsResponse.success ? collectionsResponse.collections.length : 0,
+          totalSavedResults: resultsResponse.success ? resultsResponse.results.length : 0
+        })
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
       } finally {
@@ -76,32 +59,32 @@ const Dashboard = () => {
       color: 'bg-green-500'
     },
     {
-      title: 'Manage Collections',
-      description: 'View and organize your data',
-      href: '/collections',
-      icon: Database,
+      title: 'Saved Results',
+      description: 'View and manage saved scraping results',
+      href: '/saved-results',
+      icon: FileText,
       color: 'bg-purple-500'
     }
   ]
 
   const statCards = [
     {
-      title: 'Total Collections',
-      value: stats.totalCollections,
-      icon: Database,
+      title: 'Saved Results',
+      value: stats.totalSavedResults,
+      icon: FileText,
       color: 'text-blue-600',
       bg: 'bg-blue-100'
     },
     {
-      title: 'Total Documents',
-      value: stats.totalDocuments,
-      icon: FileText,
+      title: 'Vector Databases',
+      value: stats.totalVectorDBs,
+      icon: Database,
       color: 'text-green-600',
       bg: 'bg-green-100'
     },
     {
       title: 'Recent Activity',
-      value: collections.length > 0 ? 'Active' : 'None',
+      value: stats.totalSavedResults > 0 ? 'Active' : 'None',
       icon: Activity,
       color: 'text-orange-600',
       bg: 'bg-orange-100'
@@ -180,64 +163,6 @@ const Dashboard = () => {
             )
           })}
         </div>
-      </div>
-
-      {/* Recent Collections */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Recent Collections</h2>
-          <Link
-            to="/collections"
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            View all →
-          </Link>
-        </div>
-
-        {collections.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Collections Yet</h3>
-            <p className="text-gray-600 mb-4">
-              Start by scraping your first website to create a collection.
-            </p>
-            <Link
-              to="/scrape"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              <Globe className="h-4 w-4 mr-2" />
-              Scrape Website
-            </Link>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <ul className="divide-y divide-gray-200">
-              {collections.slice(0, 5).map((collection) => (
-                <li key={collection.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Database className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {collection.name}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {collection.document_count} documents
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      to={`/collections`}
-                      className="text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   )
