@@ -37,6 +37,12 @@ async def lifespan(app: FastAPI):
     # Startup
     ensure_directories()
     logger.info("ScrapeSET Web Interface starting up")
+
+    # Load persisted conversations
+    global chat_sessions
+    chat_sessions = ConversationMemory.load_all_conversations()
+    logger.info(f"Loaded {len(chat_sessions)} persisted conversations")
+
     yield
     # Shutdown
     logger.info("ScrapeSET Web Interface shutting down")
@@ -550,6 +556,10 @@ async def delete_chat_session(session_id: str):
     """Delete a chat session."""
     if session_id not in chat_sessions:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Delete the persisted file first
+    memory = chat_sessions[session_id]
+    memory.delete_file()
 
     del chat_sessions[session_id]
     return {"success": True, "message": "Session deleted"}

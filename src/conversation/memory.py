@@ -54,13 +54,14 @@ class ConversationMemory:
         self.messages: List[ConversationMessage] = []
         self.created_at = datetime.now()
 
-    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None):
+    def add_message(self, role: str, content: str, metadata: Optional[Dict[str, Any]] = None, auto_save: bool = True):
         """Add a message to the conversation history.
 
         Args:
             role: Either "user" or "assistant"
             content: The message content
             metadata: Optional metadata about the message
+            auto_save: Whether to auto-save to disk after adding
         """
         message = ConversationMessage(
             role=role,
@@ -77,6 +78,10 @@ class ConversationMemory:
             self.messages = self.messages[2:]
 
         logger.debug(f"Added {role} message to conversation {self.session_id}")
+
+        # Auto-save to disk for persistence
+        if auto_save:
+            self.save_to_file()
 
     def add_user_message(self, content: str, metadata: Optional[Dict[str, Any]] = None):
         """Add a user message to the conversation."""
@@ -137,6 +142,26 @@ class ConversationMemory:
         """Clear all conversation history."""
         self.messages.clear()
         logger.info(f"Cleared conversation history for session {self.session_id}")
+
+    def delete_file(self) -> bool:
+        """Delete the persisted conversation file.
+
+        Returns:
+            True if successful or file doesn't exist, False otherwise
+        """
+        try:
+            conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+            file_path = conversations_dir / f"conversation_{self.session_id}.json"
+
+            if file_path.exists():
+                file_path.unlink()
+                logger.info(f"Deleted conversation file {file_path}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete conversation file: {e}")
+            return False
 
     def get_stats(self) -> Dict[str, Any]:
         """Get conversation statistics.
@@ -223,6 +248,28 @@ class ConversationMemory:
         except Exception as e:
             logger.error(f"Failed to load conversation from {file_path}: {e}")
             return None
+
+    @classmethod
+    def load_all_conversations(cls) -> Dict[str, 'ConversationMemory']:
+        """Load all persisted conversations from the conversations directory.
+
+        Returns:
+            Dictionary mapping session_id to ConversationMemory instances
+        """
+        conversations = {}
+        conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+
+        if not conversations_dir.exists():
+            logger.info("No conversations directory found, starting fresh")
+            return conversations
+
+        for file_path in conversations_dir.glob("conversation_*.json"):
+            memory = cls.load_from_file(file_path)
+            if memory:
+                conversations[memory.session_id] = memory
+
+        logger.info(f"Loaded {len(conversations)} conversations from disk")
+        return conversations
 
     def __str__(self) -> str:
         """String representation of the conversation."""
