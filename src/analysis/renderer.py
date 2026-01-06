@@ -64,7 +64,7 @@ class ReportRenderer:
     def render_summary(self, data: dict[str, Any]) -> str:
         """Render content summary."""
         summary_text = data.get('summary', '').replace('\n', '<br>')
-        key_points_html = " ".join([f'<li><span class="font-medium text-blue-600">{p.get("location", "")}</span> {p.get("point", "")}</li>' for p in data.get('key_points', [])])
+        key_claims_html = " ".join([f'<li><span class="font-medium text-blue-600">{i+1}.</span> {c.get("text", "")}</li>' for i, c in enumerate(data.get('key_claims', []))])
         conclusions_html = " ".join([f'<li>{c}</li>' for c in data.get('conclusions', [])])
         
         html = f"""
@@ -76,9 +76,9 @@ class ReportRenderer:
             
             <div class="grid md:grid-cols-2 gap-6">
                 <div>
-                    <h3 class="text-lg font-semibold mb-3">Key Points</h3>
+                    <h3 class="text-lg font-semibold mb-3">Key Claims</h3>
                     <ul class="space-y-2">
-                        {key_points_html}
+                        {key_claims_html}
                     </ul>
                 </div>
                 <div>

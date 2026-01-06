@@ -938,6 +938,21 @@ async def analysis_step_stream(request: AnalysisStepRequest):
                     except Exception as save_error:
                         logger.warning(f"Failed to auto-save analysis: {save_error}")
 
+                # Auto-save claim review after claims step completes
+                if request.step == "claims" and request.previous_data:
+                    try:
+                        url = request.previous_data.get("url", "")
+                        if url and result.get("claims"):
+                            analysis_store = AnalysisStore()
+                            claim_review = analysis_store.save_claim_review(
+                                url=url,
+                                claims=result.get("claims", [])
+                            )
+                            result["claim_review_id"] = claim_review.id
+                            logger.info(f"Auto-saved claim review {claim_review.id} after claims step (streaming)")
+                    except Exception as save_error:
+                        logger.warning(f"Failed to auto-save claim review: {save_error}")
+
                 yield f"data: {json.dumps({'type': 'complete', 'success': True, 'data': result})}\n\n"
         except Exception as e:
             logger.error(f"Analysis step {request.step} failed: {e}\n{traceback.format_exc()}")
@@ -1161,6 +1176,35 @@ async def list_verifications(source_url: Optional[str] = None, limit: int = 50):
 
     except Exception as e:
         logger.error(f"Failed to list verifications: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============== Claim Review Persistence Endpoints ==============
+
+
+@app.get("/api/analysis/claim-review/by-url")
+async def get_claim_review_by_url(url: str):
+    """Get a claim review by URL.
+
+    Returns the most recent claim review for the given URL, if one exists.
+    """
+    try:
+        analysis_store = AnalysisStore()
+        claim_review = analysis_store.get_claim_review_by_url(url)
+
+        if not claim_review:
+            return {
+                "success": True,
+                "claim_review": None
+            }
+
+        return {
+            "success": True,
+            "claim_review": claim_review.to_dict()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get claim review: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

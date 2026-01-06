@@ -34,7 +34,7 @@ class ContentAnalysis:
 
     # Summary data
     executive_summary: Optional[str] = None
-    key_points: Optional[List[Dict[str, str]]] = None  # [{point, location}]
+    key_claims: Optional[List[Dict[str, str]]] = None  # [{text, location}]
     main_argument: Optional[str] = None
     conclusions: Optional[List[str]] = None
 
@@ -59,7 +59,7 @@ class ContentAnalysis:
             "source_credibility_reasoning": self.source_credibility_reasoning,
             "source_potential_biases": self.source_potential_biases or [],
             "executive_summary": self.executive_summary,
-            "key_points": self.key_points or [],
+            "key_claims": self.key_claims or [],
             "main_argument": self.main_argument,
             "conclusions": self.conclusions or [],
             "status": self.status,
@@ -67,6 +67,26 @@ class ContentAnalysis:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+@dataclass
+class ClaimReview:
+    """Represents a claim review result for a URL."""
+    id: str
+    url: str
+    url_hash: str
+    claims: List[Dict[str, Any]]  # [{text, type, evidence, location}]
+    created_at: Optional[datetime] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "url": self.url,
+            "url_hash": self.url_hash,
+            "claims": self.claims,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 
@@ -119,6 +139,21 @@ class AnalysisStore:
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_content_analyses_created_at
                 ON content_analyses(created_at DESC)
+            """)
+            # Claim reviews table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS claim_reviews (
+                    id TEXT PRIMARY KEY,
+                    url TEXT NOT NULL,
+                    url_hash TEXT NOT NULL,
+                    claims JSON NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(url_hash)
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_claim_reviews_url_hash
+                ON claim_reviews(url_hash)
             """)
             conn.commit()
 
@@ -402,9 +437,9 @@ class AnalysisStore:
         if row["source_potential_biases"]:
             biases = json.loads(row["source_potential_biases"])
 
-        key_points = None
+        key_claims = None
         if row["key_points"]:
-            key_points = json.loads(row["key_points"])
+            key_claims = json.loads(row["key_points"])
 
         conclusions = None
         if row["conclusions"]:
@@ -442,7 +477,7 @@ class AnalysisStore:
             source_credibility_reasoning=row["source_credibility_reasoning"],
             source_potential_biases=biases,
             executive_summary=row["executive_summary"],
-            key_points=key_points,
+            key_claims=key_claims,
             main_argument=row["main_argument"],
             conclusions=conclusions,
             status=row["status"],
@@ -450,4 +485,116 @@ class AnalysisStore:
             created_at=created_at,
             updated_at=updated_at,
             completed_at=completed_at,
+        )
+
+    # Claim Review methods
+
+    def save_claim_review(
+        self,
+        url: str,
+        claims: List[Dict[str, Any]]
+    ) -> ClaimReview:
+        """Save or update a claim review for a URL.
+
+        Args:
+            url: The source URL
+            claims: List of claim dicts with text, type, evidence, location
+
+        Returns:
+            The saved ClaimReview object
+        """
+        url_hash_value = hash_url(url)
+        now = datetime.now()
+
+        with self._get_connection() as conn:
+            # Check if exists
+            existing = conn.execute(
+                "SELECT id FROM claim_reviews WHERE url_hash = ?",
+                (url_hash_value,)
+            ).fetchone()
+
+            if existing:
+                # Update existing
+                review_id = existing["id"]
+                conn.execute(
+                    """
+                    UPDATE claim_reviews
+                    SET claims = ?, created_at = ?
+                    WHERE id = ?
+                    """,
+                    (json.dumps(claims), now.isoformat(), review_id)
+                )
+                logger.info(f"Updated claim review {review_id} for URL: {url[:50]}...")
+            else:
+                # Create new
+                review_id = str(uuid.uuid4())
+                conn.execute(
+                    """
+                    INSERT INTO claim_reviews (id, url, url_hash, claims, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (review_id, url, url_hash_value, json.dumps(claims), now.isoformat())
+                )
+                logger.info(f"Created claim review {review_id} for URL: {url[:50]}...")
+
+            conn.commit()
+
+        return ClaimReview(
+            id=review_id,
+            url=url,
+            url_hash=url_hash_value,
+            claims=claims,
+            created_at=now
+        )
+
+    def get_claim_review_by_url(self, url: str) -> Optional[ClaimReview]:
+        """Get a claim review by URL."""
+        url_hash_value = hash_url(url)
+
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM claim_reviews WHERE url_hash = ?",
+                (url_hash_value,)
+            ).fetchone()
+
+        if not row:
+            return None
+
+        return self._row_to_claim_review(row)
+
+    def delete_claim_review(self, url: str) -> bool:
+        """Delete a claim review by URL."""
+        url_hash_value = hash_url(url)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM claim_reviews WHERE url_hash = ?",
+                (url_hash_value,)
+            )
+            conn.commit()
+            deleted = cursor.rowcount > 0
+
+        if deleted:
+            logger.info(f"Deleted claim review for URL: {url[:50]}...")
+        return deleted
+
+    def _row_to_claim_review(self, row: sqlite3.Row) -> ClaimReview:
+        """Convert a database row to a ClaimReview object."""
+        claims = []
+        if row["claims"]:
+            claims = json.loads(row["claims"])
+
+        created_at = None
+        if row["created_at"]:
+            try:
+                created_at = datetime.fromisoformat(row["created_at"])
+            except ValueError:
+                created_at = datetime.now()
+
+        return ClaimReview(
+            id=row["id"],
+            url=row["url"],
+            url_hash=row["url_hash"],
+            claims=claims,
+            created_at=created_at
         )

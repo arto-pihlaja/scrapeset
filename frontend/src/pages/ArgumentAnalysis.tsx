@@ -13,7 +13,7 @@ import {
     History,
     RefreshCw
 } from 'lucide-react'
-import api, { ContentAnalysis } from '../services/api'
+import api, { ContentAnalysis, ClaimReview } from '../services/api'
 import { VerifyButton } from '../components/ClaimVerification'
 
 interface AnalysisData {
@@ -51,6 +51,10 @@ const ArgumentAnalysis = () => {
     const [existingAnalysis, setExistingAnalysis] = useState<ContentAnalysis | null>(null)
     const [checkingExisting, setCheckingExisting] = useState(false)
     const [showExistingBanner, setShowExistingBanner] = useState(false)
+
+    // Previous claim review detection
+    const [existingClaimReview, setExistingClaimReview] = useState<ClaimReview | null>(null)
+    const [showClaimReviewBanner, setShowClaimReviewBanner] = useState(false)
 
     const formatDate = (dateStr: string) => {
         const date = new Date(dateStr)
@@ -99,14 +103,14 @@ const ArgumentAnalysis = () => {
         }
     }
 
-    const loadPreviousAnalysis = () => {
+    const loadPreviousAnalysis = async () => {
         if (!existingAnalysis) return
 
         // Convert stored analysis to the format expected by the UI
         const summaryData = {
             summary: {
                 summary: existingAnalysis.executive_summary,
-                key_points: existingAnalysis.key_points || [],
+                key_claims: existingAnalysis.key_claims || [],
                 main_argument: existingAnalysis.main_argument,
                 conclusions: existingAnalysis.conclusions || []
             },
@@ -120,18 +124,56 @@ const ArgumentAnalysis = () => {
         setAnalysisData({ summary: summaryData })
         setActiveStep(1)  // Move to next step after summary
         setShowExistingBanner(false)
+
+        // Check for existing claim review when loading previous summary
+        await checkForExistingClaimReview(existingAnalysis.url)
     }
 
     const startFreshAnalysis = () => {
         setShowExistingBanner(false)
         setExistingAnalysis(null)
+        setShowClaimReviewBanner(false)
+        setExistingClaimReview(null)
         setAnalysisData({})
         setActiveStep(0)
     }
 
+    const checkForExistingClaimReview = async (url: string) => {
+        try {
+            const result = await api.getClaimReviewByUrl(url)
+            if (result.success && result.claim_review) {
+                setExistingClaimReview(result.claim_review)
+                setShowClaimReviewBanner(true)
+            } else {
+                setExistingClaimReview(null)
+                setShowClaimReviewBanner(false)
+            }
+        } catch (err) {
+            console.error('Failed to check for existing claim review:', err)
+        }
+    }
+
+    const loadPreviousClaimReview = () => {
+        if (!existingClaimReview) return
+
+        // Convert stored claim review to the format expected by the UI
+        const claimsData = {
+            claims: existingClaimReview.claims
+        }
+
+        setAnalysisData(prev => ({ ...prev, claims: claimsData }))
+        setActiveStep(prev => Math.max(prev, 2))  // Move to next step after claims
+        setShowClaimReviewBanner(false)
+    }
+
+    const startFreshClaimReview = () => {
+        setShowClaimReviewBanner(false)
+        setExistingClaimReview(null)
+    }
+
     const steps = [
         { id: 'summary', name: 'Summary', icon: FileText },
-        { id: 'claims', name: 'Key Claims', icon: List },
+        { id: 'claims', name: 'Claim Review', icon: List },
         { id: 'controversy', name: 'Controversy', icon: ShieldAlert },
         { id: 'fallacies', name: 'Fallacies', icon: AlertTriangle },
         { id: 'counterargument', name: 'Counterarguments', icon: RotateCcw },
@@ -146,20 +188,36 @@ const ArgumentAnalysis = () => {
         setProgressPercent(0)
 
         let previous_data = null
+        // Get the summary data, handling both flat (from API) and nested (from loadPreviousAnalysis) structures
+        const getSummaryData = () => {
+            const summary = analysisData.summary
+            // If nested structure (from loadPreviousAnalysis), extract inner summary
+            if (summary?.summary?.summary) return summary.summary
+            // Otherwise use flat structure directly
+            return summary
+        }
+
         if (stepId === 'summary') previous_data = savedResultData
-        else if (stepId === 'claims') previous_data = analysisData.summary
+        else if (stepId === 'claims') previous_data = {
+            summary_data: getSummaryData(),
+            full_text: savedResultData.content,
+            url: savedResultData.url  // Include URL for persistence
+        }
         else if (stepId === 'controversy') previous_data = {
-            summary: analysisData.summary.summary,
-            claims: analysisData.claims,
+            summary_data: getSummaryData(),
             full_text: savedResultData.content
         }
         else if (stepId === 'fallacies') previous_data = {
-            claims: analysisData.claims,
+            summary_data: getSummaryData(),
             full_text: savedResultData.content
         }
         else if (stepId === 'counterargument') previous_data = {
-            claims: analysisData.claims,
-            summary: analysisData.summary.summary
+            summary_data: getSummaryData()
+        }
+
+        // Hide claim review banner when running claims step fresh
+        if (stepId === 'claims') {
+            setShowClaimReviewBanner(false)
         }
 
         try {
@@ -174,6 +232,11 @@ const ArgumentAnalysis = () => {
             if (result.success) {
                 setAnalysisData(prev => ({ ...prev, [stepId]: result.data }))
                 setActiveStep(prev => Math.max(prev, steps.findIndex(s => s.id === stepId) + 1))
+
+                // After summary step completes, check for existing claim review
+                if (stepId === 'summary' && savedResultData.url) {
+                    await checkForExistingClaimReview(savedResultData.url)
+                }
             } else {
                 setError(result.error || `Failed to run ${stepId}`)
             }
@@ -192,24 +255,30 @@ const ArgumentAnalysis = () => {
 
         switch (stepId) {
             case 'summary':
+                // Handle both flat structure (from API) and nested structure (from loadPreviousAnalysis)
+                const summaryData = data.summary?.summary ? data.summary : data
+                const keyClaims = summaryData.key_claims || []
                 return (
                     <div className="space-y-4">
                         <div className="bg-white p-4 rounded-lg shadow-sm border">
                             <h3 className="font-bold mb-2">Executive Summary</h3>
-                            <p className="text-gray-700">{data.summary.summary}</p>
+                            <p className="text-gray-700">{summaryData.summary}</p>
                         </div>
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="bg-white p-4 rounded-lg shadow-sm border">
-                                <h3 className="font-bold mb-2">Key Points</h3>
-                                <ul className="list-disc list-inside space-y-1 text-sm">
-                                    {data.summary.key_points.map((p: any, i: number) => (
-                                        <li key={i}><span className="text-blue-600 font-medium">{p.location}</span> {p.point}</li>
+                                <h3 className="font-bold mb-2">Key Claims</h3>
+                                <ul className="space-y-2 text-sm">
+                                    {keyClaims.map((c: any, i: number) => (
+                                        <li key={i} className="flex items-start gap-2">
+                                            <span className="text-blue-600 font-medium shrink-0">{i + 1}.</span>
+                                            <span>{c.text}</span>
+                                        </li>
                                     ))}
                                 </ul>
                             </div>
                             <div className="bg-white p-4 rounded-lg shadow-sm border">
                                 <h3 className="font-bold mb-2">Main Argument</h3>
-                                <p className="text-sm italic">{data.summary.main_argument}</p>
+                                <p className="text-sm italic">{summaryData.main_argument}</p>
                             </div>
                         </div>
                     </div>
@@ -407,7 +476,7 @@ const ArgumentAnalysis = () => {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-2">
                                         <h2 className="text-lg font-bold text-gray-800">{step.name}</h2>
-                                        {isEnabled && !isCompleted && !isActive && (
+                                        {isEnabled && !isCompleted && !isActive && !(step.id === 'claims' && showClaimReviewBanner) && (
                                             <button
                                                 onClick={() => runStep(step.id)}
                                                 className="text-sm text-blue-600 font-medium hover:underline flex items-center gap-1"
@@ -416,6 +485,37 @@ const ArgumentAnalysis = () => {
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Previous Claim Review Banner */}
+                                    {step.id === 'claims' && isEnabled && !isCompleted && !isActive && showClaimReviewBanner && existingClaimReview && (
+                                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg mb-3">
+                                            <div className="flex items-start gap-3">
+                                                <History className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                                <div className="flex-1">
+                                                    <h4 className="font-semibold text-amber-900">Previous Claim Review Found</h4>
+                                                    <p className="text-sm text-amber-700 mt-1">
+                                                        {existingClaimReview.claims.length} claims reviewed {formatRelativeDate(existingClaimReview.created_at)}
+                                                    </p>
+                                                    <div className="flex gap-2 mt-3">
+                                                        <button
+                                                            onClick={loadPreviousClaimReview}
+                                                            className="px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 flex items-center gap-1"
+                                                        >
+                                                            <History className="h-3.5 w-3.5" />
+                                                            Load Previous
+                                                        </button>
+                                                        <button
+                                                            onClick={startFreshClaimReview}
+                                                            className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg border border-amber-300 hover:bg-amber-50 flex items-center gap-1"
+                                                        >
+                                                            <RefreshCw className="h-3.5 w-3.5" />
+                                                            Run Fresh
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {isActive && (
                                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 animate-pulse">

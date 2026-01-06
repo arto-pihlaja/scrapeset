@@ -135,7 +135,7 @@ export interface ContentAnalysis {
   source_credibility_reasoning: string | null
   source_potential_biases: string[]
   executive_summary: string | null
-  key_points: Array<{ point: string; location: string }>
+  key_claims: Array<{ text: string; location: string }>
   main_argument: string | null
   conclusions: string[]
   status: string
@@ -154,6 +154,19 @@ export interface AnalysisHistoryItem {
   status: string
   created_at: string | null
   completed_at: string | null
+}
+
+export interface ClaimReview {
+  id: string
+  url: string
+  url_hash: string
+  claims: Array<{
+    text: string
+    type: string
+    evidence?: string
+    location?: string
+  }>
+  created_at: string | null
 }
 
 export const api = {
@@ -631,7 +644,7 @@ export const api = {
     }
     summary: {
       summary?: string
-      key_points?: Array<{ point: string; location: string }>
+      key_claims?: Array<{ text: string; location: string }>
       main_argument?: string
       conclusions?: string[]
     }
@@ -641,6 +654,15 @@ export const api = {
     analysis?: ContentAnalysis
   }> {
     const response = await axiosInstance.post('/analysis/save', data)
+    return response.data
+  },
+
+  // Claim Review Persistence
+  async getClaimReviewByUrl(url: string): Promise<{
+    success: boolean
+    claim_review: ClaimReview | null
+  }> {
+    const response = await axiosInstance.get('/analysis/claim-review/by-url', { params: { url } })
     return response.data
   }
 }
