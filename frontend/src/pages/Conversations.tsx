@@ -51,7 +51,7 @@ const Conversations = () => {
   }
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
       return
     }
 
@@ -64,11 +64,11 @@ const Conversations = () => {
         if (selectedSession?.session_id === sessionId) {
           setSelectedSession(null)
         }
-        alert('Conversation deleted successfully!')
+        alert('Chat deleted successfully!')
       }
     } catch (error) {
       console.error('Failed to delete session:', error)
-      alert('Failed to delete conversation. Please try again.')
+      alert('Failed to delete chat. Please try again.')
     }
   }
 
@@ -92,7 +92,7 @@ const Conversations = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Conversations</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Chat history</h1>
         <p className="mt-2 text-gray-600">
           View and manage your saved chat conversations
         </p>
@@ -104,7 +104,7 @@ const Conversations = () => {
           {sessions.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <History className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Conversations</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No chat history</h3>
               <p className="text-gray-600">
                 Start a chat session to see your conversations here.
               </p>
@@ -113,7 +113,7 @@ const Conversations = () => {
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-medium text-gray-900">
-                  Saved Conversations ({sessions.length})
+                  Saved chats ({sessions.length})
                 </h2>
               </div>
 
@@ -152,7 +152,7 @@ const Conversations = () => {
                             fetchSessionDetails(session.session_id)
                           }}
                           className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50"
-                          title="View conversation"
+                          title="View chat"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
@@ -162,7 +162,7 @@ const Conversations = () => {
                             handleDeleteSession(session.session_id)
                           }}
                           className="p-1 text-gray-400 hover:text-red-600 rounded hover:bg-red-50"
-                          title="Delete conversation"
+                          title="Delete chat"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -190,7 +190,7 @@ const Conversations = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-medium text-gray-900">
-                          Conversation: {selectedSession.session_id}
+                          Chat: {selectedSession.session_id}
                         </h3>
                         <p className="text-sm text-gray-600">
                           {selectedSession.messages.length} messages
@@ -254,9 +254,9 @@ const Conversations = () => {
           ) : (
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <MessageCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Conversation Details</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Chat details</h3>
               <p className="text-gray-600">
-                Select a conversation from the list to view its messages and details.
+                Select a chat from the list to view its messages and details.
               </p>
             </div>
           )}

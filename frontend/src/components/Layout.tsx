@@ -29,7 +29,7 @@ const Layout = ({ children }: LayoutProps) => {
     { name: 'Argument Analysis', href: '/analysis', icon: ShieldAlert },
     { name: 'Analysis History', href: '/analysis-history', icon: ClipboardList },
     { name: 'Chat', href: '/chat', icon: MessageCircle },
-    { name: 'Conversations', href: '/conversations', icon: History },
+    { name: 'Chat history', href: '/conversations', icon: History },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]
 

@@ -431,14 +431,20 @@ async def chat_with_collection(request: ChatRequest):
         llm_client = LLMClient()
 
         # Get or create conversation memory
+        # Note: For new sessions, we delay adding to chat_sessions until success
+        # to avoid empty sessions from failed requests
+        is_new_session = False
+        memory = None  # Initialize to None first
         if request.use_memory:
             session_id = request.session_id or f"session_{len(chat_sessions)}"
-            if session_id not in chat_sessions:
-                chat_sessions[session_id] = ConversationMemory(session_id=session_id)
-            memory = chat_sessions[session_id]
+            if session_id in chat_sessions:
+                memory = chat_sessions[session_id]
+            else:
+                # Create memory object but don't add to dict yet
+                memory = ConversationMemory(session_id=session_id)
+                is_new_session = True
         else:
             session_id = "no_memory"
-            memory = None
 
         # Determine collections to search
         collections_to_search = []
@@ -469,7 +475,7 @@ async def chat_with_collection(request: ChatRequest):
             )
 
         # Generate response with conversation context
-        conversation_history = memory.get_conversation_context() if memory else None
+        conversation_history = memory.get_conversation_context() if memory is not None else None
 
         generated_result = llm_client.generate_response(
             query=request.message,
@@ -480,9 +486,15 @@ async def chat_with_collection(request: ChatRequest):
         response_text = generated_result["response"]
 
         # Update conversation memory
-        if memory:
+        # Note: Use `is not None` because ConversationMemory has __len__ method
+        if memory is not None:
             memory.add_user_message(request.message)
             memory.add_assistant_message(response_text)
+            # Register new session only after messages are successfully added
+            if is_new_session:
+                chat_sessions[session_id] = memory
+            # Ensure persistence after each exchange
+            memory.save_to_file()
 
         # Format sources
         sources = []

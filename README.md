@@ -2,7 +2,7 @@
 
 A powerful command-line tool for scraping web content and querying it using Retrieval-Augmented Generation (RAG). Extract text from websites, store it in a vector database, and ask intelligent questions about the content.
 
-## ✨ Features
+## Features
 
 - **Smart Web Scraping**: Extract and filter text content from any website
 - **Interactive Content Selection**: Review and choose which text elements to include
@@ -14,8 +14,9 @@ A powerful command-line tool for scraping web content and querying it using Retr
 - **Web Interface**: Modern React-based web UI with real-time updates
 - **Rich CLI Interface**: Beautiful command-line interface with progress indicators
 - **Persistent Storage**: Your scraped content and conversations are saved locally
+- **Claim Verification**: Fact-check claims against web evidence with source credibility assessment
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -44,9 +45,10 @@ uv pip install -r requirements.txt
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 OPENROUTER_API_KEY=your_openrouter_key
+TAVILY_API_KEY=your_tavily_key  # Required for claim verification
 ```
 
-## 🌐 Web Interface
+## Web Interface
 
 ScrapeSET now includes a modern web interface built with React and FastAPI!
 
@@ -76,12 +78,14 @@ npm run dev
 
 ### Web Interface Features
 
-- **📊 Dashboard**: Overview of collections, statistics, and quick actions
-- **🌐 Web Scraping**: Interactive URL scraping with text element selection
-- **📚 Collections**: Visual management with clear documents vs drop collection options
-- **💬 Chat Interface**: Real-time conversations with RAG-powered responses
-- **📝 Conversation History**: View and manage saved chat sessions
-- **⚙️ Settings**: Configure LLM providers, embedding models, and processing options
+- **Dashboard**: Overview of collections, statistics, and quick actions
+- **Web Scraping**: Interactive URL scraping with text element selection
+- **Collections**: Visual management with clear documents vs drop collection options
+- **Chat Interface**: Real-time conversations with RAG-powered responses
+- **Conversation History**: View and manage saved chat sessions
+- **Settings**: Configure LLM providers, embedding models, and processing options
+- **Argument Analysis**: CrewAI-powered content analysis with claim detection
+- **Claim Verification**: Verify claims with web search, evidence categorization, and credibility scoring
 
 The web interface provides all CLI functionality in an intuitive, visual format with:
 - Real-time progress updates
@@ -90,15 +94,46 @@ The web interface provides all CLI functionality in an intuitive, visual format 
 - Responsive design for all devices
 - Conversation memory with session management
 
+## Claim Verification
 
+ScrapeSET includes AI-powered claim verification that fact-checks claims against external evidence:
 
-### Basic CLI Usage
+### How It Works
+
+1. **Select a Claim**: From the key claims extracted during content analysis
+2. **Verify**: Click the "Verify" button to trigger fact-checking
+3. **Review Evidence**: See supporting and contradicting evidence with source links
+4. **View Conclusion**: Get a verdict (Supported, Refuted, or Inconclusive) with reasoning
+
+### Verification Pipeline
+
+The verification uses a 4-agent CrewAI pipeline:
+- **WebSearchAgent**: Searches the web for relevant evidence using Tavily
+- **EvidenceAnalyzerAgent**: Categorizes results as supporting or contradicting
+- **CredibilityAssessorAgent**: Evaluates source reliability with scoring
+- **ConclusionSynthesizerAgent**: Generates final verdict with cited evidence
+
+### Example Output
+
+**Claim**: "Unvaccinated children have lower allergy rates"
+
+**Evidence For** (1 source):
+- Journal of Translational Science - "Unvaccinated children showed lower rates..."
+- Credibility: Peer-reviewed, small sample size
+
+**Evidence Against** (2 sources):
+- CDC Research Database - "No statistically significant difference found..."
+- Credibility: Government agency, large sample (650,000)
+
+**Conclusion**: Refuted - Most credible sources indicate the claim is not well-supported.
+
+## Basic CLI Usage
 
 1. **Scrape a website**:
 ```bash
 uv run python main.py scrape https://example.com
 ```
-The tool will extract text elements 
+The tool will extract text elements
 
 
 **Example:**
@@ -239,7 +274,7 @@ uv run python main.py clear --collection my_collection --drop
 - **Clear**: Removes all documents but keeps the collection structure
 - **Drop**: Completely removes the collection and all its documents (cannot be undone)
 
-## ⚙️ Configuration
+## Configuration
 
 The tool can be configured through environment variables or a `.env` file:
 
@@ -249,6 +284,9 @@ The tool can be configured through environment variables or a `.env` file:
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 OPENROUTER_API_KEY=your_openrouter_key
+
+# Claim Verification
+TAVILY_API_KEY=your_tavily_key    # Required for claim verification
 
 # LLM Settings
 DEFAULT_LLM_PROVIDER=openai
@@ -301,7 +339,7 @@ REQUEST_TIMEOUT=30           # HTTP request timeout
 USER_AGENT=Mozilla/5.0...   # Custom user agent
 ```
 
-## 🧠 Embedding Models
+## Embedding Models
 
 Choose different embedding models for RAG by setting the `EMBEDDING_MODEL` environment variable:
 
@@ -349,19 +387,24 @@ EMBEDDING_MODEL=sentence-transformers/all-mpnet-base-v2 uv run python main.py sc
 
 **Note:** Different embedding models create incompatible vector spaces. Use `python main.py clear` when switching embedding models.
 
-## 🏗️ Architecture
+## Architecture
 
 The project follows a modular architecture:
 
 ```
 src/
 ├── scraper/        # Web scraping functionality
-├── text/          # Text processing and chunking
-├── vector/        # Vector database operations
-├── llm/           # LLM interface and RAG
-├── cli/           # Command-line interface
-├── config/        # Configuration management
-└── utils/         # Logging and utilities
+├── text/           # Text processing and chunking
+├── vector/         # Vector database operations
+├── llm/            # LLM interface and RAG
+├── cli/            # Command-line interface
+├── config/         # Configuration management
+├── analysis/       # CrewAI-based content analysis + verification
+│   ├── crew.py             # AnalysisCrew orchestrator
+│   ├── verification_crew.py # Claim verification orchestrator
+│   ├── verification_agents.py # Verification agents
+│   └── tools/tavily.py     # Web search tool
+└── utils/          # Logging and utilities
 ```
 
 ### Core Components
@@ -370,9 +413,25 @@ src/
 - **TextProcessor**: Cleans text, creates chunks, and counts tokens
 - **VectorStore**: Manages ChromaDB operations and similarity search
 - **LLMClient**: Interfaces with multiple LLM providers via LiteLLM
+- **AnalysisCrew**: Orchestrates multi-agent content analysis
+- **VerificationCrew**: Orchestrates 4-agent claim verification pipeline
 - **CLI**: Provides user-friendly command-line interface
 
-## 🧪 Testing
+## Tech Stack
+
+- **Python 3.12+**: Core language
+- **BeautifulSoup4**: HTML parsing and text extraction
+- **ChromaDB**: Vector database for embeddings
+- **SQLite**: Structured data storage (verification results)
+- **LiteLLM**: Unified interface for multiple LLM providers
+- **CrewAI**: Multi-agent orchestration for analysis and verification
+- **Tavily**: Web search API for claim verification
+- **Typer**: Command-line interface framework
+- **Rich**: Beautiful terminal output
+- **Tiktoken**: Token counting
+- **Loguru**: Advanced logging
+
+## Testing
 
 Run the test suite:
 
@@ -380,7 +439,7 @@ Run the test suite:
 uv run python -m pytest tests/ -v
 ```
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Installation Issues
 
@@ -423,6 +482,13 @@ rm -rf ./data/chroma_db
 
 2. Check for port conflicts (default: backend 8000, frontend 3000)
 
+**Problem**: Claim verification not working
+
+**Solutions**:
+1. Ensure `TAVILY_API_KEY` is set in your `.env` file
+2. Check Tavily API quota and rate limits
+3. Verify network connectivity for web searches
+
 ### Collection Management
 
 **Problem**: Understanding the difference between Clear vs Drop operations
@@ -435,33 +501,24 @@ rm -rf ./data/chroma_db
 - Use **Clear** when you want to refresh the content but keep using the same collection
 - Use **Drop** when you want to completely remove a collection you no longer need
 
-## 📝 Tech Stack
-
-- **Python 3.12+**: Core language
-- **BeautifulSoup4**: HTML parsing and text extraction
-- **ChromaDB**: Vector database for embeddings
-- **LiteLLM**: Unified interface for multiple LLM providers
-- **Typer**: Command-line interface framework
-- **Rich**: Beautiful terminal output
-- **Tiktoken**: Token counting
-- **Loguru**: Advanced logging
-
-## 🛣️ Roadmap
+## Roadmap
 
 ### Current Version (v1.0)
-- ✅ Basic web scraping with interactive selection
-- ✅ Vector storage and RAG queries
-- ✅ Multi-LLM support
-- ✅ CLI interface
-- ✅ Conversation memory and context retention
-- ✅ Multiple embedding models support
-- ✅ Conversation persistence and management
+- Basic web scraping with interactive selection
+- Vector storage and RAG queries
+- Multi-LLM support
+- CLI interface
+- Conversation memory and context retention
+- Multiple embedding models support
+- Conversation persistence and management
+- Claim Verification with web search and credibility assessment
 
 ### Future Enhancements
 - **Advanced RAG**: Multiple embedding models, re-ranking, optimization
 - **Performance**: Async processing, caching, batch operations
+- **Export Formats**: PDF, markdown for sharing verification reports
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -469,11 +526,11 @@ rm -rf ./data/chroma_db
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 If you encounter any issues or have questions:
 
@@ -483,6 +540,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Happy scraping and querying! 🎉**
-
-
+**Happy scraping and querying!**

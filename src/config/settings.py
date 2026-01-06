@@ -95,3 +95,5 @@ def ensure_directories():
     Path(settings.log_file).parent.mkdir(parents=True, exist_ok=True)
     Path(settings.download_folder).mkdir(parents=True, exist_ok=True)
     Path(settings.audio_chunks_folder).mkdir(parents=True, exist_ok=True)
+    # Conversations directory for chat persistence
+    (Path(settings.chroma_persist_directory).parent / "conversations").mkdir(parents=True, exist_ok=True)

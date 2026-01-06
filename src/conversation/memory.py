@@ -150,7 +150,11 @@ class ConversationMemory:
             True if successful or file doesn't exist, False otherwise
         """
         try:
-            conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+            # Use absolute path for consistency
+            chroma_path = Path(settings.chroma_persist_directory)
+            if not chroma_path.is_absolute():
+                chroma_path = Path(__file__).parent.parent.parent / settings.chroma_persist_directory
+            conversations_dir = chroma_path.parent / "conversations"
             file_path = conversations_dir / f"conversation_{self.session_id}.json"
 
             if file_path.exists():
@@ -212,19 +216,25 @@ class ConversationMemory:
         """
         try:
             if file_path is None:
-                # Auto-generate filename
-                conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+                # Auto-generate filename using absolute path
+                chroma_path = Path(settings.chroma_persist_directory)
+                if not chroma_path.is_absolute():
+                    # Make it absolute relative to the project root
+                    chroma_path = Path(__file__).parent.parent.parent / settings.chroma_persist_directory
+                conversations_dir = chroma_path.parent / "conversations"
                 conversations_dir.mkdir(parents=True, exist_ok=True)
                 file_path = conversations_dir / f"conversation_{self.session_id}.json"
+
+            logger.debug(f"Saving conversation {self.session_id} to {file_path}")
 
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
 
-            logger.info(f"Saved conversation {self.session_id} to {file_path}")
+            logger.info(f"Saved conversation {self.session_id} to {file_path} ({len(self.messages)} messages)")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to save conversation: {e}")
+            logger.error(f"Failed to save conversation {self.session_id}: {e}", exc_info=True)
             return False
 
     @classmethod
@@ -257,10 +267,18 @@ class ConversationMemory:
             Dictionary mapping session_id to ConversationMemory instances
         """
         conversations = {}
-        conversations_dir = Path(settings.chroma_persist_directory).parent / "conversations"
+
+        # Use absolute path for consistency
+        chroma_path = Path(settings.chroma_persist_directory)
+        if not chroma_path.is_absolute():
+            chroma_path = Path(__file__).parent.parent.parent / settings.chroma_persist_directory
+        conversations_dir = chroma_path.parent / "conversations"
+
+        logger.info(f"Looking for conversations in: {conversations_dir}")
 
         if not conversations_dir.exists():
             logger.info("No conversations directory found, starting fresh")
+            conversations_dir.mkdir(parents=True, exist_ok=True)
             return conversations
 
         for file_path in conversations_dir.glob("conversation_*.json"):
@@ -281,3 +299,7 @@ class ConversationMemory:
     def __len__(self) -> int:
         """Return number of messages in conversation."""
         return len(self.messages)
+
+    def __bool__(self) -> bool:
+        """Return True if memory object exists (regardless of message count)."""
+        return True
